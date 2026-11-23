@@ -165,15 +165,30 @@ class OnechatService {
     );
   }
 
-  Future<List<Map<String, dynamic>>> fetchMessages(String roomId,
-      {int limit = 60}) async {
+  /// Historial con el perfil del autor incluido en UNA sola consulta
+  /// (antes eran dos viajes: mensajes y luego perfiles).
+  /// Devuelve (mensajes, perfilesPorUid).
+  Future<(List<Map<String, dynamic>>, Map<String, Map<String, dynamic>>)>
+      fetchMessagesWithProfiles(String roomId, {int limit = 60}) async {
     final rows = await _db
         .from('room_messages')
-        .select()
+        .select(
+            '*, sender:profiles!room_messages_sender_uid_fkey(nickname, nickname_color)')
         .eq('room_id', roomId)
         .order('created_at', ascending: false)
         .limit(limit);
-    return List<Map<String, dynamic>>.from(rows.reversed);
+    final messages = <Map<String, dynamic>>[];
+    final profiles = <String, Map<String, dynamic>>{};
+    for (final raw in rows.reversed) {
+      final row = Map<String, dynamic>.from(raw);
+      final sender = row.remove('sender');
+      final uid = row['sender_uid'] as String?;
+      if (uid != null && sender is Map) {
+        profiles[uid] = {'uid': uid, ...Map<String, dynamic>.from(sender)};
+      }
+      messages.add(row);
+    }
+    return (messages, profiles);
   }
 
   RealtimeChannel subscribeMessages(
@@ -211,7 +226,8 @@ class OnechatService {
 
   /// Envía un mensaje; detecta @menciones y avisa en la Sala Status
   /// de cada mencionado (sin avisar a bloqueados ni a uno mismo).
-  Future<void> sendMessage({
+  /// Devuelve la fila insertada (para el eco optimista en pantalla).
+  Future<Map<String, dynamic>> sendMessage({
     required String roomId,
     required String body,
     required Set<String> blockedUids,
@@ -250,6 +266,7 @@ class OnechatService {
         'payload': {'room_id': roomId, 'message_id': inserted['id']},
       });
     }
+    return inserted;
   }
 
   // ---------- Presencia ----------

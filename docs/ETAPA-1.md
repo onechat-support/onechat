@@ -61,3 +61,17 @@
   mensajes de Mario en la Sala General quedaron restaurados como «Zeta».
 - Verificado por API: mensaje de ZethFoto conserva su nombre tras
   borrar el perfil del invitado.
+
+## Optimización de velocidad (2026-11-23)
+- Medido: cada consulta al servidor tarda ~0,4–1,2 s (plan gratuito
+  «Nano» de Supabase); entrar a una sala encadenaba 4 consultas en
+  serie (bloqueos → unión → mensajes → perfiles) = varios segundos.
+- Arreglos: historial + perfiles en UNA consulta (join), carga en
+  paralelo, unión a la sala sin bloquear, y envío optimista (el
+  mensaje se pinta al instante y se confirma al volver del servidor,
+  sin duplicados). Restaurados como «Zeta» los 2 mensajes huérfanos
+  que quedaban en la sala Chile.
+- Lo que no cambia con código: el piso de latencia del plan gratuito
+  y la descarga inicial de la web (~10 MB la primera vez; luego queda
+  en caché). El salto grande será Supabase Pro (US$25/mes) cuando
+  Mario lo decida, y la app nativa en su momento.

@@ -22,6 +22,7 @@ class _ChatPageState extends State<ChatPage> {
   final _scroll = ScrollController();
   final List<Map<String, dynamic>> _messages = [];
   final Map<String, Map<String, dynamic>> _profiles = {};
+  final Set<int> _knownIds = {};
   Set<String> _blocked = {};
   List<Map<String, dynamic>> _occupants = [];
   RealtimeChannel? _msgChannel;
@@ -39,23 +40,31 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Future<void> _init() async {
-    _blocked = await _svc.fetchBlockedUids();
-    await _svc.joinRoom(_roomId);
-    final rows = await _svc.fetchMessages(_roomId);
-    final senderUids =
-        rows.map((r) => r['sender_uid'] as String?).whereType<String>().toSet();
-    final profiles = await _svc.profilesByUids(senderUids.toList());
-    for (final p in profiles) {
-      _profiles[p['uid'] as String] = p;
-    }
+    // En paralelo: bloqueos e historial (con perfiles incluidos) en un
+    // solo viaje cada uno; la unión a la sala no espera a nadie.
+    _svc.joinRoom(_roomId);
+    final results = await Future.wait([
+      _svc.fetchBlockedUids(),
+      _svc.fetchMessagesWithProfiles(_roomId),
+    ]);
+    _blocked = results[0] as Set<String>;
+    final (rows, profiles) =
+        results[1] as (List<Map<String, dynamic>>, Map<String, Map<String, dynamic>>);
+    _profiles.addAll(profiles);
     if (!mounted) return;
     setState(() {
-      _messages.addAll(rows.where((r) => !_isBlocked(r)));
+      for (final r in rows.where((r) => !_isBlocked(r))) {
+        _messages.add(r);
+        final id = r['id'];
+        if (id is int) _knownIds.add(id);
+      }
       _loading = false;
     });
     _jumpToBottom();
 
     _msgChannel = _svc.subscribeMessages(_roomId, (row) async {
+      final id = row['id'];
+      if (id is int && _knownIds.contains(id)) return; // ya lo mostré (eco)
       if (_isBlocked(row)) return;
       final sender = row['sender_uid'] as String?;
       if (sender != null && !_profiles.containsKey(sender)) {
@@ -63,7 +72,10 @@ class _ChatPageState extends State<ChatPage> {
         if (p != null) _profiles[sender] = p;
       }
       if (!mounted) return;
-      setState(() => _messages.add(row));
+      setState(() {
+        _messages.add(row);
+        if (id is int) _knownIds.add(id);
+      });
       _jumpToBottom();
     });
 
@@ -108,21 +120,43 @@ class _ChatPageState extends State<ChatPage> {
   Future<void> _send() async {
     final text = _input.text.trim();
     if (text.isEmpty || _sending) return;
-    setState(() => _sending = true);
+    _input.clear();
+    // Eco optimista: el mensaje se pinta al instante, sin esperar al
+    // servidor; si el envío falla, se retira y se avisa.
+    final temp = <String, dynamic>{
+      'id': -DateTime.now().microsecondsSinceEpoch,
+      'room_id': _roomId,
+      'sender_uid': _svc.myUid,
+      'sender_nickname': widget.myProfile['nickname'],
+      'body': text,
+      'mentions': <String>[],
+      'kind': 'text',
+    };
+    setState(() {
+      _messages.add(temp);
+      _sending = true;
+    });
+    _jumpToBottom();
     try {
-      await _svc.sendMessage(
+      final inserted = await _svc.sendMessage(
         roomId: _roomId,
         body: text,
         blockedUids: _blocked,
         senderNickname: widget.myProfile['nickname'] as String,
       );
-      _input.clear();
+      final realId = inserted['id'];
+      if (realId is int) _knownIds.add(realId);
+      if (!mounted) return;
+      setState(() {
+        final i = _messages.indexOf(temp);
+        if (i >= 0) _messages[i] = inserted;
+      });
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No se pudo enviar: $e')),
-        );
-      }
+      if (!mounted) return;
+      setState(() => _messages.remove(temp));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo enviar: $e')),
+      );
     } finally {
       if (mounted) setState(() => _sending = false);
     }
