@@ -52,7 +52,7 @@ class _SignUpPageState extends State<SignUpPage> {
         setState(() {
           _busy = false;
           _info =
-              'Cuenta creada. Revisa tu correo para confirmarla y luego inicia sesión; tu nickname se reservará en ese momento.';
+              'Cuenta creada. Te enviamos un correo de confirmación: ábrelo y toca el enlace (vuelves a la app). Luego inicia sesión y tu nickname «$nick» se reservará automáticamente a tu nombre. Si el correo no era el tuyo, no confirmes nada: ese nickname seguirá libre.';
         });
       } else {
         Navigator.of(context).pushAndRemoveUntil(
@@ -251,6 +251,18 @@ class _NicknameSetupPageState extends State<NicknameSetupPage> {
   final _svc = OnechatService();
   bool _busy = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    // Si eligió nickname al registrarse, viaja con su cuenta:
+    // se intenta reservar automáticamente sin que lo reescriba.
+    final saved = _svc.currentUser?.userMetadata?['nickname'] as String?;
+    if (saved != null && saved.isNotEmpty) {
+      _nick.text = saved;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _submit());
+    }
+  }
 
   @override
   void dispose() {

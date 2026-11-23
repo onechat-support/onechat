@@ -75,3 +75,23 @@
   y la descarga inicial de la web (~10 MB la primera vez; luego queda
   en caché). El salto grande será Supabase Pro (US$25/mes) cuando
   Mario lo decida, y la app nativa en su momento.
+
+## Registro de cuentas: verificación (2026-11-23)
+- «Confirm email» desactivado en Supabase durante la fase de pruebas
+  (registro instantáneo; se reactivará antes del lanzamiento público).
+- Verificado por API con la cuenta de prueba ZethRegistro: registro
+  con sesión inmediata, perfil registrado y reserva de nickname
+  creados; un invitado que intenta el mismo nickname recibe 409 y la
+  función de reclamo lo rechaza (los registrados nunca se liberan).
+
+## Confirmación de correo: reactivada a pedido de Mario (2026-11-23)
+- Mario observó que sin confirmación, un correo mal escrito crea una
+  cuenta irrecuperable y quema el nickname elegido. Correcto: se
+  reactivó «Confirm email» en Supabase.
+- Site URL y Redirect URL de Auth apuntan ahora a la app publicada
+  (antes: localhost:3000); el enlace del correo devuelve a ONEchat.
+- Flujo resultante: el nickname viaja en los datos de la cuenta al
+  registrarse y SOLO se reserva al primer inicio de sesión tras
+  confirmar. Una cuenta con correo erróneo jamás reserva el nickname.
+- Verificado por API: el registro devuelve usuario SIN sesión, con
+  confirmation_sent_at y user_metadata.nickname guardado.

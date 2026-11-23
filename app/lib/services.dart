@@ -75,14 +75,21 @@ class OnechatService {
     }
   }
 
-  /// Registro con correo. Si el proyecto exige confirmar el correo,
-  /// devuelve null y el perfil se crea al primer inicio de sesión.
+  /// Registro con correo (con confirmación activa): el nickname viaja
+  /// en los datos de la cuenta y se reserva al primer inicio de sesión,
+  /// DESPUÉS de confirmar el correo. Una cuenta con el correo mal
+  /// escrito nunca llega a reservar nada: el nickname no se quema.
+  /// Devuelve null si falta confirmar el correo.
   Future<Map<String, dynamic>?> signUp({
     required String email,
     required String password,
     required String nickname,
   }) async {
-    final res = await _db.auth.signUp(email: email, password: password);
+    final res = await _db.auth.signUp(
+      email: email,
+      password: password,
+      data: {'nickname': nickname},
+    );
     final user = res.user;
     if (user == null) throw Exception('No se pudo crear la cuenta.');
     if (res.session == null) return null; // falta confirmar el correo
