@@ -35,6 +35,7 @@ class OnechatService {
           'nickname_lower': nickname.toLowerCase(),
           'email': email,
           'is_guest': isGuest,
+          'last_seen_at': DateTime.now().toUtc().toIso8601String(),
         })
         .select()
         .single();
@@ -51,6 +52,7 @@ class OnechatService {
       e is PostgrestException && e.code == '23505';
 
   /// Entrada como invitado: sesión anónima + perfil con nickname único.
+  /// Si el nickname lo dejó un invitado inactivo (>15 min), se reclama.
   Future<Map<String, dynamic>> enterAsGuest(String nickname) async {
     final res = await _db.auth.signInAnonymously();
     final user = res.user;
@@ -58,10 +60,17 @@ class OnechatService {
     try {
       return await _createProfile(uid: user.id, nickname: nickname, isGuest: true);
     } catch (e) {
-      await _db.auth.signOut();
       if (_isNicknameTaken(e)) {
+        final claimed = await _db.rpc('claim_guest_nickname',
+            params: {'p_nickname': nickname}) as bool;
+        if (claimed) {
+          return await _createProfile(
+              uid: user.id, nickname: nickname, isGuest: true);
+        }
+        await _db.auth.signOut();
         throw Exception('Ese nickname ya está en uso. Prueba con otro.');
       }
+      await _db.auth.signOut();
       rethrow;
     }
   }
@@ -116,7 +125,25 @@ class OnechatService {
     );
   }
 
-  Future<void> signOut() => _db.auth.signOut();
+  /// Al salir, el invitado libera su nickname borrando su perfil;
+  /// las cuentas registradas conservan el suyo (está reservado).
+  Future<void> signOut() async {
+    final uid = myUid;
+    if (uid != null) {
+      final profile = await fetchMyProfile();
+      if (profile != null && profile['is_guest'] == true) {
+        await _db.from('profiles').delete().eq('uid', uid);
+      }
+    }
+    await _db.auth.signOut();
+  }
+
+  Future<void> touchLastSeen() async {
+    final uid = myUid;
+    if (uid == null) return;
+    await _db.from('profiles').update(
+        {'last_seen_at': DateTime.now().toUtc().toIso8601String()}).eq('uid', uid);
+  }
 
   // ---------- Salas y chat ----------
 
@@ -130,10 +157,12 @@ class OnechatService {
   }
 
   Future<void> joinRoom(String roomId) async {
-    await _db.from('room_members').upsert({
-      'room_id': roomId,
-      'uid': myUid,
-    });
+    // Idempotente: si ya eres miembro, no hace nada (sin UPDATE).
+    await _db.from('room_members').upsert(
+      {'room_id': roomId, 'uid': myUid},
+      onConflict: 'room_id,uid',
+      ignoreDuplicates: true,
+    );
   }
 
   Future<List<Map<String, dynamic>>> fetchMessages(String roomId,
