@@ -111,7 +111,11 @@ class _ChatPageState extends State<ChatPage> {
     setState(() => _sending = true);
     try {
       await _svc.sendMessage(
-          roomId: _roomId, body: text, blockedUids: _blocked);
+        roomId: _roomId,
+        body: text,
+        blockedUids: _blocked,
+        senderNickname: widget.myProfile['nickname'] as String,
+      );
       _input.clear();
     } catch (e) {
       if (mounted) {
@@ -211,7 +215,12 @@ class _ChatPageState extends State<ChatPage> {
                           final m = _messages[i];
                           final sender = m['sender_uid'] as String?;
                           final p = sender == null ? null : _profiles[sender];
-                          final nick = p?['nickname'] as String? ?? '···';
+                          // El perfil manda si existe; si el autor ya no
+                          // tiene perfil (invitado que salió), se usa la
+                          // foto del nickname guardada en el mensaje.
+                          final nick = p?['nickname'] as String? ??
+                              m['sender_nickname'] as String? ??
+                              '···';
                           final isMe = sender == _svc.myUid;
                           final mentionsMe = (m['mentions'] as List?)
                                   ?.contains(_svc.myUid) ==

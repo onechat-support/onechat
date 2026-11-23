@@ -215,6 +215,7 @@ class OnechatService {
     required String roomId,
     required String body,
     required Set<String> blockedUids,
+    required String senderNickname,
   }) async {
     final mentionedLowers = RegExp(r'@([A-Za-z0-9_]{3,20})')
         .allMatches(body)
@@ -236,6 +237,7 @@ class OnechatService {
         .insert({
           'room_id': roomId,
           'sender_uid': myUid,
+          'sender_nickname': senderNickname,
           'body': body,
           'mentions': mentionUids,
         })

@@ -51,3 +51,13 @@
   Verificado por API: reclamo de inactivo OK, reclamo de activo
   rechazado, borrado al salir OK. El perfil huérfano «Zeta» de la
   primera prueba fue eliminado.
+
+## Corrección: mensajes sin autor (2026-11-23)
+- Síntoma: al volver a una sala, los mensajes propios salían con «···».
+  Causa raíz: eran mensajes de una sesión de invitado anterior; al
+  cerrarla, el perfil se borró y la FK dejó sender_uid en NULL.
+- Arreglo (v1.3): cada mensaje guarda una foto del nickname del autor
+  (sender_nickname); la app lo usa si el perfil ya no existe. Los dos
+  mensajes de Mario en la Sala General quedaron restaurados como «Zeta».
+- Verificado por API: mensaje de ZethFoto conserva su nombre tras
+  borrar el perfil del invitado.
