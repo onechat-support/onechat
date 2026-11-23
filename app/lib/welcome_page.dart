@@ -248,6 +248,8 @@ class _WelcomePageState extends State<WelcomePage> {
                     TextField(
                       controller: _passwordController,
                       obscureText: true,
+                      autocorrect: false,
+                      enableSuggestions: false,
                       textInputAction: TextInputAction.go,
                       onSubmitted: (_) => _busy ? null : _continue(),
                       decoration: const InputDecoration(

@@ -103,6 +103,8 @@ class _SignUpPageState extends State<SignUpPage> {
                   TextField(
                     controller: _pass,
                     obscureText: true,
+                    autocorrect: false,
+                    enableSuggestions: false,
                     decoration: const InputDecoration(
                       labelText: 'Contraseña',
                       prefixIcon: Icon(Icons.lock_outline),
@@ -125,6 +127,152 @@ class _SignUpPageState extends State<SignUpPage> {
                         textAlign: TextAlign.center,
                         style:
                             const TextStyle(color: OneChatColors.secondary)),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Pantalla a la que llega el enlace de «¿Olvidaste tu contraseña?»:
+/// el enlace abre una sesión de recuperación y aquí se fija la clave
+/// nueva. Al terminar se cierra esa sesión para entrar ya con la
+/// clave nueva desde la pantalla de acceso.
+class UpdatePasswordPage extends StatefulWidget {
+  const UpdatePasswordPage({super.key, required this.onDone});
+
+  final VoidCallback onDone;
+
+  @override
+  State<UpdatePasswordPage> createState() => _UpdatePasswordPageState();
+}
+
+class _UpdatePasswordPageState extends State<UpdatePasswordPage> {
+  final _pass = TextEditingController();
+  final _pass2 = TextEditingController();
+  final _svc = OnechatService();
+  bool _busy = false;
+  bool _done = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _pass.dispose();
+    _pass2.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final p1 = _pass.text;
+    if (p1.length < 8) {
+      setState(() => _error = 'Usa al menos 8 caracteres.');
+      return;
+    }
+    if (p1 != _pass2.text) {
+      setState(() => _error = 'Las dos contraseñas no coinciden.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await _svc.updatePassword(p1);
+      await _svc.signOut();
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _done = true;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = e is AuthException ? friendlyAuthError(e) : _clean(e);
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasSession = _svc.isSignedIn;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Nueva contraseña')),
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(28),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_done) ...[
+                    const Icon(Icons.check_circle_outline,
+                        size: 56, color: OneChatColors.primary),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Contraseña actualizada. Ahora entra con tu nickname y tu clave nueva.',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+                    FilledButton(
+                      onPressed: widget.onDone,
+                      child: const Text('IR A LA PANTALLA DE ACCESO'),
+                    ),
+                  ] else if (!hasSession) ...[
+                    const Text(
+                      'Este enlace ya se usó o venció. Pide uno nuevo: en la pantalla de acceso escribe tu nickname, toca «CHATEAR DIRECTAMENTE» y luego «¿Olvidaste tu contraseña?».',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+                    FilledButton(
+                      onPressed: widget.onDone,
+                      child: const Text('IR A LA PANTALLA DE ACCESO'),
+                    ),
+                  ] else ...[
+                    const Text(
+                      'Escribe tu contraseña nueva. La vas a usar junto con tu nickname para entrar.',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+                    TextField(
+                      controller: _pass,
+                      obscureText: true,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      decoration: const InputDecoration(
+                        labelText: 'Contraseña nueva',
+                        prefixIcon: Icon(Icons.lock_outline),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: _pass2,
+                      obscureText: true,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      decoration: const InputDecoration(
+                        labelText: 'Repite la contraseña nueva',
+                        prefixIcon: Icon(Icons.lock_reset),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    FilledButton(
+                      onPressed: _busy ? null : _submit,
+                      child: Text(_busy ? 'Guardando…' : 'GUARDAR CONTRASEÑA'),
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 14),
+                      Text(_error!,
+                          textAlign: TextAlign.center,
+                          style:
+                              const TextStyle(color: OneChatColors.mention)),
+                    ],
                   ],
                 ],
               ),

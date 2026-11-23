@@ -13,7 +13,7 @@ String friendlyAuthError(Object e) {
   if (t.contains('user_already_exists') ||
       t.contains('already registered') ||
       t.contains('already exists')) {
-    return 'Ese correo ya tiene una cuenta. Inicia sesión; si aún no la confirmaste, entra a «Iniciar sesión» y usa «Reenviar confirmación».';
+    return 'Ese correo ya tiene una cuenta. Entra con tu nickname y tu contraseña; si aún no confirmaste el correo, pide el reenvío desde el paso de contraseña.';
   }
   if (t.contains('email_not_confirmed') || t.contains('not confirmed')) {
     return 'Tu correo aún no está confirmado. Revisa tu bandeja (y la carpeta de spam) o reenvía la confirmación.';
@@ -153,6 +153,12 @@ class OnechatService {
         email,
         redirectTo: 'https://onechat-support.github.io/onechat/',
       );
+
+  /// Fija la contraseña nueva (con la sesión que abre el enlace de
+  /// recuperación). La contraseña se envía EXACTAMENTE como se escribe,
+  /// igual que en el registro: sin recortes.
+  Future<void> updatePassword(String newPassword) =>
+      _db.auth.updateUser(UserAttributes(password: newPassword));
 
   /// Estado de un nickname para el acceso unificado:
   /// 'registered' | 'guest' | 'free'. No expone ningún correo.

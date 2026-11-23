@@ -149,3 +149,14 @@
   no lo incluían; sin eso la función recibía «permission denied»).
 - Verificado por API: nickname+clave correctos devuelven sesión
   válida; clave mala e invitado, rechazados.
+
+## Recuperación de contraseña funcional (2026-11-23)
+- Faltaba la pantalla de cambio de clave: el enlace del correo abría
+  el acceso normal. Ahora la app detecta el enlace de recuperación
+  al abrirse (y el evento passwordRecovery) y muestra «Nueva
+  contraseña» (dos campos, mínimo 8); al guardar cierra la sesión de
+  recuperación y se entra con la clave nueva.
+- Revisión de código: registro y acceso envían la contraseña tal
+  cual, sin recortes; campos de clave sin autocorrección en todas
+  las pantallas. La cuenta de Mario («Zeeth») existía y estaba
+  confirmada; la clave guardada no coincidía con la escrita.
