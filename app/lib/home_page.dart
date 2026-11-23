@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import 'chat_page.dart';
+import 'dm_pages.dart';
 import 'main.dart';
 import 'services.dart';
 import 'theme.dart';
@@ -18,6 +19,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _tab = 0;
   int _unread = 0;
+  int _dmUnread = 0;
   late Map<String, dynamic> _profile = widget.profile;
   final _svc = OnechatService();
 
@@ -29,14 +31,22 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _refreshUnread() async {
-    final n = await _svc.unreadCount();
-    if (mounted) setState(() => _unread = n);
+    final results = await Future.wait([
+      _svc.unreadCount(),
+      _svc.dmUnreadCount(),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _unread = results[0];
+      _dmUnread = results[1];
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final pages = [
       _RoomsTab(myProfile: _profile),
+      ConversationsTab(myProfile: _profile),
       _StatusTab(onSeen: () {
         if (_unread != 0) setState(() => _unread = 0);
       }),
@@ -69,13 +79,22 @@ class _HomePageState extends State<HomePage> {
         selectedIndex: _tab,
         onDestinationSelected: (i) {
           setState(() => _tab = i);
-          if (i == 0) _refreshUnread();
+          _refreshUnread();
         },
         destinations: [
           const NavigationDestination(
               icon: Icon(Icons.forum_outlined),
               selectedIcon: Icon(Icons.forum),
               label: 'Salas'),
+          NavigationDestination(
+            icon: Badge(
+              isLabelVisible: _dmUnread > 0,
+              label: Text('$_dmUnread'),
+              child: const Icon(Icons.chat_bubble_outline),
+            ),
+            selectedIcon: const Icon(Icons.chat_bubble),
+            label: 'Privados',
+          ),
           NavigationDestination(
             icon: Badge(
               isLabelVisible: _unread > 0,

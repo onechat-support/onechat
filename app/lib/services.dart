@@ -410,6 +410,227 @@ class OnechatService {
         .isFilter('read_at', null);
   }
 
+  // ---------- Susurros (Etapa 2) ----------
+  // Privados DENTRO de la sala: la base solo los entrega al emisor y
+  // al destinatario (RLS), nadie más puede leerlos ni por accidente.
+
+  /// Susurros de esta sala en los que participo (como emisor o
+  /// destinatario), con los perfiles de ambos incluidos.
+  Future<List<Map<String, dynamic>>> fetchWhispers(String roomId,
+      {int limit = 100}) async {
+    final rows = await _db
+        .from('whispers')
+        .select(
+            '*, sender:profiles!whispers_sender_uid_fkey(nickname, nickname_color), target:profiles!whispers_target_uid_fkey(nickname, nickname_color)')
+        .eq('room_id', roomId)
+        .order('created_at', ascending: false)
+        .limit(limit);
+    return List<Map<String, dynamic>>.from(rows.reversed);
+  }
+
+  Future<Map<String, dynamic>> sendWhisper({
+    required String roomId,
+    required String targetUid,
+    required String body,
+  }) async {
+    final inserted = await _db
+        .from('whispers')
+        .insert({
+          'room_id': roomId,
+          'sender_uid': myUid,
+          'target_uid': targetUid,
+          'body': body,
+        })
+        .select()
+        .single();
+    await _db.from('notifications').insert({
+      'uid': targetUid,
+      'kind': 'whisper',
+      'payload': {'room_id': roomId},
+    });
+    return inserted;
+  }
+
+  RealtimeChannel subscribeWhispers(
+      String roomId, void Function(Map<String, dynamic> row) onInsert) {
+    final channel = _db.channel('room-whispers-$roomId');
+    channel
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'whispers',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'room_id',
+            value: roomId,
+          ),
+          callback: (payload) => onInsert(payload.newRecord),
+        )
+        .subscribe();
+    return channel;
+  }
+
+  // ---------- Mensajes privados 1:1 (Etapa 2) ----------
+
+  /// La conversación con otra persona (se crea si no existe).
+  /// La pareja se guarda siempre en orden (user_a < user_b).
+  Future<Map<String, dynamic>> getOrCreateConversation(
+      String otherUid) async {
+    final me = myUid!;
+    final a = me.compareTo(otherUid) < 0 ? me : otherUid;
+    final b = me.compareTo(otherUid) < 0 ? otherUid : me;
+    final existing = await _db
+        .from('conversations')
+        .select()
+        .eq('user_a', a)
+        .eq('user_b', b)
+        .limit(1);
+    if (existing.isNotEmpty) return existing.first;
+    return await _db
+        .from('conversations')
+        .insert({'user_a': a, 'user_b': b})
+        .select()
+        .single();
+  }
+
+  /// Mis conversaciones con: el perfil del otro, el último mensaje y
+  /// cuántos privados suyos tengo sin leer.
+  Future<List<Map<String, dynamic>>> fetchConversations() async {
+    final me = myUid!;
+    final convs = await _db
+        .from('conversations')
+        .select()
+        .or('user_a.eq.$me,user_b.eq.$me')
+        .order('created_at', ascending: false);
+    final result = <Map<String, dynamic>>[];
+    if (convs.isEmpty) return result;
+    final otherUids = <String>{};
+    final convIds = <String>[];
+    for (final c in convs) {
+      final other = c['user_a'] == me ? c['user_b'] : c['user_a'];
+      otherUids.add(other as String);
+      convIds.add(c['id'] as String);
+    }
+    final profiles = await profilesByUids(otherUids.toList());
+    final profileById = {for (final p in profiles) p['uid'] as String: p};
+    // Últimos mensajes de todas mis conversaciones en una consulta.
+    final recent = await _db
+        .from('direct_messages')
+        .select()
+        .inFilter('conversation_id', convIds)
+        .order('created_at', ascending: false)
+        .limit(300);
+    final lastByConv = <String, Map<String, dynamic>>{};
+    final unreadByConv = <String, int>{};
+    for (final m in recent) {
+      final cid = m['conversation_id'] as String;
+      lastByConv.putIfAbsent(cid, () => m);
+      if (m['sender_uid'] != me && m['read_at'] == null) {
+        unreadByConv[cid] = (unreadByConv[cid] ?? 0) + 1;
+      }
+    }
+    for (final c in convs) {
+      final cid = c['id'] as String;
+      final other = c['user_a'] == me ? c['user_b'] : c['user_a'];
+      result.add({
+        ...c,
+        'other': profileById[other],
+        'last': lastByConv[cid],
+        'unread': unreadByConv[cid] ?? 0,
+      });
+    }
+    // Primero las conversaciones con actividad más reciente.
+    result.sort((x, y) {
+      final tx = (x['last']?['created_at'] ?? x['created_at']) as String;
+      final ty = (y['last']?['created_at'] ?? y['created_at']) as String;
+      return ty.compareTo(tx);
+    });
+    return result;
+  }
+
+  /// Total de privados sin leer (para el distintivo de la pestaña).
+  Future<int> dmUnreadCount() async {
+    final me = myUid!;
+    final convs = await _db
+        .from('conversations')
+        .select('id')
+        .or('user_a.eq.$me,user_b.eq.$me');
+    if (convs.isEmpty) return 0;
+    final ids = convs.map((c) => c['id'] as String).toList();
+    final rows = await _db
+        .from('direct_messages')
+        .select('id')
+        .inFilter('conversation_id', ids)
+        .neq('sender_uid', me)
+        .isFilter('read_at', null);
+    return rows.length;
+  }
+
+  Future<List<Map<String, dynamic>>> fetchDirectMessages(
+      String conversationId,
+      {int limit = 100}) async {
+    final rows = await _db
+        .from('direct_messages')
+        .select()
+        .eq('conversation_id', conversationId)
+        .order('created_at', ascending: false)
+        .limit(limit);
+    return List<Map<String, dynamic>>.from(rows.reversed);
+  }
+
+  Future<Map<String, dynamic>> sendDirectMessage({
+    required String conversationId,
+    required String otherUid,
+    required String body,
+  }) async {
+    final inserted = await _db
+        .from('direct_messages')
+        .insert({
+          'conversation_id': conversationId,
+          'sender_uid': myUid,
+          'body': body,
+        })
+        .select()
+        .single();
+    await _db.from('notifications').insert({
+      'uid': otherUid,
+      'kind': 'dm',
+      'payload': {'conversation_id': conversationId},
+    });
+    return inserted;
+  }
+
+  /// Marca como leídos los privados que me enviaron en esta
+  /// conversación (la regla de la base solo deja hacerlo al
+  /// destinatario).
+  Future<void> markConversationRead(String conversationId) async {
+    await _db
+        .from('direct_messages')
+        .update({'read_at': DateTime.now().toUtc().toIso8601String()})
+        .eq('conversation_id', conversationId)
+        .neq('sender_uid', myUid!)
+        .isFilter('read_at', null);
+  }
+
+  RealtimeChannel subscribeDirectMessages(
+      String conversationId, void Function(Map<String, dynamic> row) onInsert) {
+    final channel = _db.channel('dm-$conversationId');
+    channel
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'direct_messages',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'conversation_id',
+            value: conversationId,
+          ),
+          callback: (payload) => onInsert(payload.newRecord),
+        )
+        .subscribe();
+    return channel;
+  }
+
   // ---------- Social: favoritos, bloqueos, reportes ----------
 
   Future<Set<String>> fetchBlockedUids() async {

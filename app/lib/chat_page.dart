@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'dm_pages.dart';
 import 'services.dart';
 import 'theme.dart';
 import 'user_sheet.dart';
@@ -23,10 +24,13 @@ class _ChatPageState extends State<ChatPage> {
   final List<Map<String, dynamic>> _messages = [];
   final Map<String, Map<String, dynamic>> _profiles = {};
   final Set<int> _knownIds = {};
+  final Set<int> _knownWhisperIds = {};
   Set<String> _blocked = {};
   List<Map<String, dynamic>> _occupants = [];
   RealtimeChannel? _msgChannel;
   RealtimeChannel? _presenceChannel;
+  RealtimeChannel? _whisperChannel;
+  Map<String, dynamic>? _whisperTo;
   bool _loading = true;
   bool _sending = false;
 
@@ -39,6 +43,24 @@ class _ChatPageState extends State<ChatPage> {
     _init();
   }
 
+  /// Prepara un susurro para la línea de tiempo: guarda los perfiles
+  /// incluidos y lo marca como susurro.
+  Map<String, dynamic> _prepareWhisper(Map<String, dynamic> raw) {
+    final row = Map<String, dynamic>.from(raw);
+    final sender = row.remove('sender');
+    final target = row.remove('target');
+    final sUid = row['sender_uid'] as String?;
+    final tUid = row['target_uid'] as String?;
+    if (sUid != null && sender is Map) {
+      _profiles[sUid] = {'uid': sUid, ...Map<String, dynamic>.from(sender)};
+    }
+    if (tUid != null && target is Map) {
+      _profiles[tUid] = {'uid': tUid, ...Map<String, dynamic>.from(target)};
+    }
+    row['is_whisper'] = true;
+    return row;
+  }
+
   Future<void> _init() async {
     // En paralelo: bloqueos e historial (con perfiles incluidos) en un
     // solo viaje cada uno; la unión a la sala no espera a nadie.
@@ -46,11 +68,13 @@ class _ChatPageState extends State<ChatPage> {
     final results = await Future.wait([
       _svc.fetchBlockedUids(),
       _svc.fetchMessagesWithProfiles(_roomId),
+      _svc.fetchWhispers(_roomId),
     ]);
     _blocked = results[0] as Set<String>;
     final (rows, profiles) =
         results[1] as (List<Map<String, dynamic>>, Map<String, Map<String, dynamic>>);
     _profiles.addAll(profiles);
+    final whisperRows = results[2] as List<Map<String, dynamic>>;
     if (!mounted) return;
     setState(() {
       for (final r in rows.where((r) => !_isBlocked(r))) {
@@ -58,9 +82,35 @@ class _ChatPageState extends State<ChatPage> {
         final id = r['id'];
         if (id is int) _knownIds.add(id);
       }
+      for (final w in whisperRows.where((w) => !_isBlocked(w))) {
+        _messages.add(_prepareWhisper(w));
+        final id = w['id'];
+        if (id is int) _knownWhisperIds.add(id);
+      }
+      // Línea de tiempo única: mensajes y susurros por hora.
+      _messages.sort((a, b) => '${a['created_at'] ?? ''}'
+          .compareTo('${b['created_at'] ?? ''}'));
       _loading = false;
     });
     _jumpToBottom();
+
+    _whisperChannel = _svc.subscribeWhispers(_roomId, (row) async {
+      final id = row['id'];
+      if (id is int && _knownWhisperIds.contains(id)) return;
+      if (_isBlocked(row)) return;
+      for (final uid in [row['sender_uid'], row['target_uid']]) {
+        if (uid is String && !_profiles.containsKey(uid)) {
+          final p = await _svc.profileByUid(uid);
+          if (p != null) _profiles[uid] = p;
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _messages.add(_prepareWhisper(row));
+        if (id is int) _knownWhisperIds.add(id);
+      });
+      _jumpToBottom();
+    });
 
     _msgChannel = _svc.subscribeMessages(_roomId, (row) async {
       final id = row['id'];
@@ -110,17 +160,81 @@ class _ChatPageState extends State<ChatPage> {
   void dispose() {
     final a = _msgChannel;
     final b = _presenceChannel;
+    final c = _whisperChannel;
     if (a != null) _svc.unsubscribe(a);
     if (b != null) _svc.unsubscribe(b);
+    if (c != null) _svc.unsubscribe(c);
     _input.dispose();
     _scroll.dispose();
     super.dispose();
+  }
+
+  void _startWhisper(Map<String, dynamic> profile) {
+    setState(() => _whisperTo = profile);
+  }
+
+  Future<void> _startDm(Map<String, dynamic> profile) async {
+    final conv = await _svc.getOrCreateConversation(profile['uid'] as String);
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => DmChatPage(
+          conversationId: conv['id'] as String,
+          other: profile,
+          myProfile: widget.myProfile,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _sendWhisper(String text) async {
+    final target = _whisperTo!;
+    final temp = <String, dynamic>{
+      'id': -DateTime.now().microsecondsSinceEpoch,
+      'room_id': _roomId,
+      'sender_uid': _svc.myUid,
+      'target_uid': target['uid'],
+      'body': text,
+      'is_whisper': true,
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+    };
+    setState(() {
+      _messages.add(temp);
+      _sending = true;
+    });
+    _jumpToBottom();
+    try {
+      final inserted = await _svc.sendWhisper(
+        roomId: _roomId,
+        targetUid: target['uid'] as String,
+        body: text,
+      );
+      final realId = inserted['id'];
+      if (realId is int) _knownWhisperIds.add(realId);
+      if (!mounted) return;
+      setState(() {
+        final i = _messages.indexOf(temp);
+        if (i >= 0) _messages[i] = {...inserted, 'is_whisper': true};
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _messages.remove(temp));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo susurrar: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
   }
 
   Future<void> _send() async {
     final text = _input.text.trim();
     if (text.isEmpty || _sending) return;
     _input.clear();
+    if (_whisperTo != null) {
+      await _sendWhisper(text);
+      return;
+    }
     // Eco optimista: el mensaje se pinta al instante, sin esperar al
     // servidor; si el envío falla, se retira y se avisa.
     final temp = <String, dynamic>{
@@ -162,6 +276,53 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
+  /// Un susurro en la línea de tiempo: morado y en cursiva, solo lo
+  /// ven emisor y destinatario. Tocar = responder susurrando.
+  Widget _whisperTile(Map<String, dynamic> m, Map<String, dynamic>? p) {
+    final senderUid = m['sender_uid'] as String?;
+    final targetUid = m['target_uid'] as String?;
+    final isMe = senderUid == _svc.myUid;
+    final otherUid = isMe ? targetUid : senderUid;
+    final other = otherUid == null ? null : _profiles[otherUid];
+    final otherNick = other?['nickname'] as String? ?? '···';
+    final senderNick = p?['nickname'] as String? ?? '···';
+    return InkWell(
+      onTap: other == null
+          ? null
+          : () async {
+              final full = await _svc.profileByUid(otherUid!) ?? other;
+              if (mounted) _startWhisper(full);
+            },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: RichText(
+          text: TextSpan(
+            style: DefaultTextStyle.of(context).style,
+            children: [
+              TextSpan(
+                text: isMe
+                    ? 'Susurras a $otherNick: '
+                    : '$senderNick te susurra: ',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontStyle: FontStyle.italic,
+                  color: OneChatColors.whisper,
+                ),
+              ),
+              TextSpan(
+                text: m['body'] as String,
+                style: const TextStyle(
+                  fontStyle: FontStyle.italic,
+                  color: OneChatColors.whisper,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showOccupants() {
     showModalBottomSheet(
       context: context,
@@ -190,7 +351,11 @@ class _ChatPageState extends State<ChatPage> {
                   if (uid == null) return;
                   final p = _profiles[uid] ?? await _svc.profileByUid(uid);
                   if (p != null && mounted) {
-                    showUserSheet(context, profile: p, roomId: _roomId);
+                    showUserSheet(context,
+                        profile: p,
+                        roomId: _roomId,
+                        onWhisper: _startWhisper,
+                        onPrivateMessage: _startDm);
                   }
                 },
               ),
@@ -256,6 +421,9 @@ class _ChatPageState extends State<ChatPage> {
                               m['sender_nickname'] as String? ??
                               '···';
                           final isMe = sender == _svc.myUid;
+                          if (m['is_whisper'] == true) {
+                            return _whisperTile(m, p);
+                          }
                           final mentionsMe = (m['mentions'] as List?)
                                   ?.contains(_svc.myUid) ==
                               true;
@@ -263,7 +431,10 @@ class _ChatPageState extends State<ChatPage> {
                             onTap: p == null
                                 ? null
                                 : () => showUserSheet(context,
-                                    profile: p, roomId: _roomId),
+                                    profile: p,
+                                    roomId: _roomId,
+                                    onWhisper: _startWhisper,
+                                    onPrivateMessage: _startDm),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(vertical: 4),
                               child: RichText(
@@ -304,6 +475,32 @@ class _ChatPageState extends State<ChatPage> {
                         },
                       ),
           ),
+          if (_whisperTo != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(16, 4, 6, 4),
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              child: Row(
+                children: [
+                  const Icon(Icons.lock_outline,
+                      size: 16, color: OneChatColors.whisper),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Susurrando a ${_whisperTo!['nickname']} — solo esa persona lo ve',
+                      style: const TextStyle(
+                          color: OneChatColors.whisper,
+                          fontStyle: FontStyle.italic),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 18),
+                    tooltip: 'Cancelar susurro',
+                    onPressed: () => setState(() => _whisperTo = null),
+                  ),
+                ],
+              ),
+            ),
           SafeArea(
             top: false,
             child: Padding(
@@ -315,8 +512,10 @@ class _ChatPageState extends State<ChatPage> {
                       controller: _input,
                       textInputAction: TextInputAction.send,
                       onSubmitted: (_) => _send(),
-                      decoration: const InputDecoration(
-                        hintText: 'Escribe un mensaje… (@nickname menciona)',
+                      decoration: InputDecoration(
+                        hintText: _whisperTo != null
+                            ? 'Escribe un susurro…'
+                            : 'Escribe un mensaje… (@nickname menciona)',
                       ),
                     ),
                   ),

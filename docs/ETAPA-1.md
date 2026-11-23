@@ -160,3 +160,18 @@
   cual, sin recortes; campos de clave sin autocorrección en todas
   las pantallas. La cuenta de Mario («Zeeth») existía y estaba
   confirmada; la clave guardada no coincidía con la escrita.
+
+## Causa raíz del «contraseña incorrecta» (2026-11-23)
+- La función login-with-nickname no respondía CORS: el navegador
+  bloqueaba la llamada en el preflight (OPTIONS → 405) y la app
+  mostraba «Nickname o contraseña incorrectos» aunque la clave
+  fuera correcta. Por API directa (curl) funcionaba, por eso las
+  pruebas pasaban. El registro de Auth lo confirmó: cero intentos
+  con contraseña y un 422 «new password should be different» que
+  probaba que la clave de Mario siempre fue la correcta.
+- Corregido: la función responde OPTIONS y agrega las cabeceras
+  Access-Control-* a todas sus respuestas. Verificado simulando
+  un navegador (preflight 200 + POST 200 con sesión; clave mala 401).
+- Lección: toda Edge Function invocada desde la app web DEBE
+  manejar CORS, y las pruebas de acceso deben hacerse simulando
+  el navegador, no solo por API directa.

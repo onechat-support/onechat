@@ -12,23 +12,34 @@ Color nickColor(String? hex) {
 }
 
 /// Ficha pública de un usuario: perfil mínimo + acciones sociales
-/// del MVP (favorito, bloquear, reportar).
+/// (favorito, bloquear, reportar) y de la Etapa 2 (susurrar dentro
+/// de la sala, mensaje privado 1:1).
 Future<void> showUserSheet(
   BuildContext context, {
   required Map<String, dynamic> profile,
   String? roomId,
+  void Function(Map<String, dynamic> profile)? onWhisper,
+  void Function(Map<String, dynamic> profile)? onPrivateMessage,
 }) {
   return showModalBottomSheet(
     context: context,
     showDragHandle: true,
-    builder: (_) => _UserSheet(profile: profile, roomId: roomId),
+    builder: (_) => _UserSheet(
+      profile: profile,
+      roomId: roomId,
+      onWhisper: onWhisper,
+      onPrivateMessage: onPrivateMessage,
+    ),
   );
 }
 
 class _UserSheet extends StatefulWidget {
-  const _UserSheet({required this.profile, this.roomId});
+  const _UserSheet(
+      {required this.profile, this.roomId, this.onWhisper, this.onPrivateMessage});
   final Map<String, dynamic> profile;
   final String? roomId;
+  final void Function(Map<String, dynamic> profile)? onWhisper;
+  final void Function(Map<String, dynamic> profile)? onPrivateMessage;
 
   @override
   State<_UserSheet> createState() => _UserSheetState();
@@ -177,6 +188,24 @@ class _UserSheetState extends State<_UserSheet> {
             Wrap(
               spacing: 10,
               children: [
+                if (widget.onPrivateMessage != null)
+                  FilledButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      widget.onPrivateMessage!(widget.profile);
+                    },
+                    icon: const Icon(Icons.chat_bubble_outline),
+                    label: const Text('Mensaje privado'),
+                  ),
+                if (widget.roomId != null && widget.onWhisper != null)
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      widget.onWhisper!(widget.profile);
+                    },
+                    icon: const Icon(Icons.voice_over_off_outlined),
+                    label: const Text('Susurrar'),
+                  ),
                 OutlinedButton.icon(
                   onPressed: _busy ? null : _toggleFav,
                   icon: Icon(
