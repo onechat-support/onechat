@@ -231,13 +231,26 @@ class OnechatService {
 
   // ---------- Salas y chat ----------
 
+  static const _categoryRank = {
+    'plataforma': 0,
+    'latino': 1,
+    'norteamerica': 2,
+    'europa': 3,
+    'tematicos': 4,
+  };
+
+  /// Salas públicas ordenadas por sección (Plataforma, Latino,
+  /// Norteamérica, Europa, Temáticos) y su orden dentro de ella.
   Future<List<Map<String, dynamic>>> fetchRooms() async {
-    final rows = await _db
-        .from('rooms')
-        .select()
-        .eq('is_public', true)
-        .order('created_at');
-    return List<Map<String, dynamic>>.from(rows);
+    final rows = await _db.from('rooms').select().eq('is_public', true);
+    final list = List<Map<String, dynamic>>.from(rows);
+    list.sort((a, b) {
+      final ra = _categoryRank[a['category']] ?? 9;
+      final rb = _categoryRank[b['category']] ?? 9;
+      if (ra != rb) return ra.compareTo(rb);
+      return ((a['sort'] as num?) ?? 0).compareTo((b['sort'] as num?) ?? 0);
+    });
+    return list;
   }
 
   Future<void> joinRoom(String roomId) async {

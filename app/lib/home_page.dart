@@ -138,6 +138,22 @@ class _RoomsTabState extends State<_RoomsTab> {
           return Center(child: Text('Error al cargar salas: ${snap.error}'));
         }
         final rooms = snap.data ?? [];
+        // Lista plana con encabezados de sección: Plataforma,
+        // Latino, Norteamérica, Europa, Temáticos.
+        const headers = {
+          'plataforma': 'Plataforma',
+          'latino': 'Latino',
+          'norteamerica': 'Norteamérica',
+          'europa': 'Europa',
+          'tematicos': 'Temáticos',
+        };
+        final items = <Object>[];
+        for (final c in headers.keys) {
+          final group = rooms.where((r) => r['category'] == c).toList();
+          if (group.isEmpty) continue;
+          items.add(headers[c]!);
+          items.addAll(group);
+        }
         return RefreshIndicator(
           onRefresh: () async {
             setState(() => _rooms = _svc.fetchRooms());
@@ -145,21 +161,42 @@ class _RoomsTabState extends State<_RoomsTab> {
           },
           child: ListView.separated(
             padding: const EdgeInsets.all(14),
-            itemCount: rooms.length,
+            itemCount: items.length,
             separatorBuilder: (_, _) => const SizedBox(height: 10),
             itemBuilder: (context, i) {
-              final r = rooms[i];
+              final it = items[i];
+              if (it is String) {
+                return Padding(
+                  padding: EdgeInsets.only(top: i == 0 ? 0 : 12, bottom: 2),
+                  child: Text(it,
+                      style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: OneChatColors.primary)),
+                );
+              }
+              final r = it as Map<String, dynamic>;
+              final isPlatform = r['category'] == 'plataforma';
               final isRegional = r['kind'] == 'regional';
               return Card(
                 child: ListTile(
                   leading: CircleAvatar(
                     backgroundColor: OneChatColors.primary,
-                    child: Icon(isRegional ? Icons.public : Icons.tag,
+                    child: Icon(
+                        isPlatform
+                            ? Icons.support_agent
+                            : isRegional
+                                ? Icons.public
+                                : Icons.tag,
                         color: Colors.black),
                   ),
                   title: Text(r['name'] as String,
                       style: const TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text(isRegional ? 'Sala regional' : 'Sala temática'),
+                  subtitle: Text(isPlatform
+                      ? 'Atendida por el Staff'
+                      : isRegional
+                          ? 'Sala regional'
+                          : 'Sala temática'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
