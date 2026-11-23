@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'home_page.dart';
 import 'services.dart';
@@ -64,7 +65,7 @@ class _SignUpPageState extends State<SignUpPage> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = _clean(e);
+        _error = e is AuthException ? friendlyAuthError(e) : _clean(e);
       });
     }
   }
@@ -148,12 +149,40 @@ class _SignInPageState extends State<SignInPage> {
   final _svc = OnechatService();
   bool _busy = false;
   String? _error;
+  String? _info;
 
   @override
   void dispose() {
     _email.dispose();
     _pass.dispose();
     super.dispose();
+  }
+
+  Future<void> _resend() async {
+    final email = _email.text.trim();
+    if (email.isEmpty) {
+      setState(() => _error = 'Escribe tu correo arriba y vuelve a tocar.');
+      return;
+    }
+    setState(() {
+      _busy = true;
+      _error = null;
+      _info = null;
+    });
+    try {
+      await _svc.resendConfirmation(email);
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _info = 'Confirmación reenviada a $email. Revisa tu bandeja y la carpeta de spam.';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = e is AuthException ? friendlyAuthError(e) : _clean(e);
+      });
+    }
   }
 
   Future<void> _submit() async {
@@ -180,7 +209,7 @@ class _SignInPageState extends State<SignInPage> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = _clean(e);
+        _error = e is AuthException ? friendlyAuthError(e) : _clean(e);
       });
     }
   }
@@ -227,6 +256,18 @@ class _SignInPageState extends State<SignInPage> {
                         textAlign: TextAlign.center,
                         style: const TextStyle(color: OneChatColors.mention)),
                   ],
+                  if (_info != null) ...[
+                    const SizedBox(height: 14),
+                    Text(_info!,
+                        textAlign: TextAlign.center,
+                        style:
+                            const TextStyle(color: OneChatColors.secondary)),
+                  ],
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: _busy ? null : _resend,
+                    child: const Text('¿No te llegó la confirmación? Reenviar'),
+                  ),
                 ],
               ),
             ),

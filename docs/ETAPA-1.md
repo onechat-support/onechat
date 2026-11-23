@@ -95,3 +95,15 @@
   confirmar. Una cuenta con correo erróneo jamás reserva el nickname.
 - Verificado por API: el registro devuelve usuario SIN sesión, con
   confirmation_sent_at y user_metadata.nickname guardado.
+
+## Errores de auth legibles + reenvío de confirmación (2026-11-23)
+- Mario chocó con «email rate limit exceeded» (429) al registrarse:
+  el correo integrado de Supabase (plan Free) tiene un cupo por hora
+  muy bajo y las pruebas por API lo habían consumido. Su cuenta NO se
+  creó (verificado en el panel): el diseño aguantó, nada se quemó.
+- La app ya no muestra errores técnicos crudos: friendlyAuthError()
+  traduce los casos de auth a lenguaje claro.
+- «Iniciar sesión» suma el botón «¿No te llegó la confirmación?
+  Reenviar» (auth.resend).
+- Pendiente pre-lanzamiento: configurar un servicio de correo real
+  (SMTP propio) — el integrado es solo para pruebas.

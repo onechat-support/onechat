@@ -1,5 +1,34 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// Traduce los errores de autenticación a lenguaje claro para el
+/// usuario (nunca se muestra el texto técnico crudo).
+String friendlyAuthError(Object e) {
+  final t = e.toString();
+  if (t.contains('over_email_send_rate_limit') ||
+      t.contains('email rate limit')) {
+    return 'Se alcanzó el límite de correos por ahora: el servicio de correo de esta etapa es muy reducido. Espera unos minutos y vuelve a intentarlo; tu nickname no se pierde.';
+  }
+  if (t.contains('user_already_exists') ||
+      t.contains('already registered') ||
+      t.contains('already exists')) {
+    return 'Ese correo ya tiene una cuenta. Inicia sesión; si aún no la confirmaste, entra a «Iniciar sesión» y usa «Reenviar confirmación».';
+  }
+  if (t.contains('email_not_confirmed') || t.contains('not confirmed')) {
+    return 'Tu correo aún no está confirmado. Revisa tu bandeja (y la carpeta de spam) o reenvía la confirmación.';
+  }
+  if (t.contains('invalid_credentials') ||
+      t.contains('Invalid login credentials')) {
+    return 'Correo o contraseña incorrectos.';
+  }
+  if (t.contains('weak_password') || t.contains('Password should')) {
+    return 'La contraseña es muy débil: usa al menos 8 caracteres.';
+  }
+  if (t.contains('invalid_email') || t.contains('Unable to validate email')) {
+    return 'Ese correo no parece válido. Revísalo e inténtalo de nuevo.';
+  }
+  return 'Algo salió mal. Inténtalo de nuevo en un momento.';
+}
+
 /// Capa de acceso a Supabase para ONEchat (Etapa 1, MVP).
 /// Toda la seguridad real la impone la base de datos con RLS;
 /// esta clase solo orquesta llamadas.
@@ -112,6 +141,10 @@ class OnechatService {
     await _db.auth.signInWithPassword(email: email, password: password);
     return fetchMyProfile();
   }
+
+  /// Reenvía el correo de confirmación de registro.
+  Future<void> resendConfirmation(String email) =>
+      _db.auth.resend(type: OtpType.signup, email: email);
 
   Future<Map<String, dynamic>?> fetchMyProfile() async {
     final uid = myUid;
