@@ -1,0 +1,12 @@
+/// Configuración pública del cliente ONEchat.
+///
+/// Estos dos valores son PÚBLICOS por diseño: la URL del proyecto y la
+/// clave "publishable" de Supabase están hechas para vivir en las apps
+/// cliente. La seguridad no depende de ocultarlos: la imponen las
+/// políticas RLS de la base de datos y las funciones de servidor.
+/// La clave secreta (service_role) jamás va en el cliente.
+class AppConfig {
+  static const supabaseUrl = 'https://jsdyoqmgdkqlkucebjmt.supabase.co';
+  static const supabasePublishableKey =
+      'sb_publishable_FE28e094cucvLYdDFlnxKQ_dxlKjXO-';
+}

@@ -1,0 +1,10 @@
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+app/build/
+app/.dart_tool/
+app/.packages
+app/.flutter-plugins*
+app/ios/Pods/
