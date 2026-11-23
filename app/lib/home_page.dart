@@ -379,6 +379,21 @@ class _ProfileTabState extends State<_ProfileTab> {
                 Text(p['is_guest'] == true
                     ? 'Invitado'
                     : 'Cuenta registrada'),
+                if (p['global_role'] == 'owner')
+                  const Text('Dueño de ONEchat',
+                      style: TextStyle(
+                          color: OneChatColors.roomOwner,
+                          fontWeight: FontWeight.w600)),
+                if (p['global_role'] == 'staff')
+                  const Text('Staff de ONEchat',
+                      style: TextStyle(
+                          color: OneChatColors.staff,
+                          fontWeight: FontWeight.w600)),
+                if (p['global_role'] == 'moderator')
+                  const Text('Moderador global',
+                      style: TextStyle(
+                          color: OneChatColors.moderator,
+                          fontWeight: FontWeight.w600)),
               ],
             ),
           ],

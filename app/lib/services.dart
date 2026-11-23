@@ -631,6 +631,85 @@ class OnechatService {
     return channel;
   }
 
+  // ---------- Moderación (Etapa 3) ----------
+  // Las sanciones se aplican desde funciones del servidor que
+  // verifican el rol de quien actúa y dejan auditoría; la app solo
+  // pide y muestra. El cumplimiento (no poder escribir estando
+  // silenciado o baneado) también vive en el servidor.
+
+  Future<Map<String, dynamic>?> memberState(String roomId, String uid) async {
+    final rows = await _db
+        .from('room_members')
+        .select()
+        .eq('room_id', roomId)
+        .eq('uid', uid)
+        .limit(1);
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  /// Todos los miembros de la sala (uid → fila), para mostrar roles
+  /// y destacados junto a la presencia.
+  Future<Map<String, Map<String, dynamic>>> roomMembersInfo(
+      String roomId) async {
+    final rows = await _db.from('room_members').select().eq('room_id', roomId);
+    return {for (final r in rows) r['uid'] as String: r};
+  }
+
+  Future<bool> moderateMember({
+    required String roomId,
+    required String targetUid,
+    required String action,
+    int? minutes,
+    String? detail,
+  }) async {
+    final r = await _db.rpc('moderate_member', params: {
+      'p_room': roomId,
+      'p_target': targetUid,
+      'p_action': action,
+      'p_minutes': minutes,
+      'p_detail': detail,
+    });
+    return r == true;
+  }
+
+  Future<bool> setRoomRole({
+    required String roomId,
+    required String targetUid,
+    required String role,
+  }) async {
+    final r = await _db.rpc('set_room_role', params: {
+      'p_room': roomId,
+      'p_target': targetUid,
+      'p_role': role,
+    });
+    return r == true;
+  }
+
+  /// Sanciones vigentes de la sala (baneos y silencios activos).
+  Future<List<Map<String, dynamic>>> fetchSanctioned(String roomId) async {
+    final nowIso = DateTime.now().toUtc().toIso8601String();
+    final rows = await _db
+        .from('room_members')
+        .select(
+            '*, member:profiles!room_members_uid_fkey(nickname, nickname_color)')
+        .eq('room_id', roomId)
+        .or('banned_at.not.is.null,muted_until.gt.$nowIso');
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
+  /// Registro de auditoría de la sala (últimas 50 acciones).
+  Future<List<Map<String, dynamic>>> fetchModActions(String roomId,
+      {int limit = 50}) async {
+    final rows = await _db
+        .from('mod_actions')
+        .select(
+            '*, actor:profiles!mod_actions_actor_uid_fkey(nickname), target:profiles!mod_actions_target_uid_fkey(nickname)')
+        .eq('room_id', roomId)
+        .order('created_at', ascending: false)
+        .limit(limit);
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
   // ---------- Social: favoritos, bloqueos, reportes ----------
 
   Future<Set<String>> fetchBlockedUids() async {

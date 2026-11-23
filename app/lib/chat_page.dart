@@ -34,6 +34,33 @@ class _ChatPageState extends State<ChatPage> {
   bool _loading = true;
   bool _sending = false;
 
+  // Moderación (Etapa 3): mi fila de miembro y la de todos (roles y
+  // destacados); los poderes se derivan de ellas y del rol global.
+  Map<String, dynamic>? _myMember;
+  Map<String, Map<String, dynamic>> _membersInfo = {};
+
+  bool get _isStaffGlobal =>
+      widget.myProfile['global_role'] == 'staff' ||
+      widget.myProfile['global_role'] == 'owner';
+  bool get _isRoomOwner => widget.room['owner_uid'] == _svc.myUid;
+
+  bool get _canModerate =>
+      _isStaffGlobal ||
+      _isRoomOwner ||
+      _myMember?['role'] == 'owner' ||
+      _myMember?['role'] == 'moderator';
+
+  bool get _canManageRoles => _isStaffGlobal || _isRoomOwner;
+
+  bool get _iAmBanned => _myMember?['banned_at'] != null;
+
+  DateTime? get _myMutedUntil {
+    final raw = _myMember?['muted_until'] as String?;
+    if (raw == null) return null;
+    final t = DateTime.tryParse(raw);
+    return (t != null && t.isAfter(DateTime.now())) ? t : null;
+  }
+
   String get _roomId => widget.room['id'] as String;
 
   @override
@@ -69,12 +96,16 @@ class _ChatPageState extends State<ChatPage> {
       _svc.fetchBlockedUids(),
       _svc.fetchMessagesWithProfiles(_roomId),
       _svc.fetchWhispers(_roomId),
+      _svc.memberState(_roomId, _svc.myUid!),
+      _svc.roomMembersInfo(_roomId),
     ]);
     _blocked = results[0] as Set<String>;
     final (rows, profiles) =
         results[1] as (List<Map<String, dynamic>>, Map<String, Map<String, dynamic>>);
     _profiles.addAll(profiles);
     final whisperRows = results[2] as List<Map<String, dynamic>>;
+    _myMember = results[3] as Map<String, dynamic>?;
+    _membersInfo = results[4] as Map<String, Map<String, dynamic>>;
     if (!mounted) return;
     setState(() {
       for (final r in rows.where((r) => !_isBlocked(r))) {
@@ -323,6 +354,125 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
+  /// Etiqueta bajo el nombre en la lista de ocupantes: rol en la
+  /// sala o destacado vigente.
+  Widget? _occupantBadge(String? uid) {
+    if (uid == null) return null;
+    final info = _membersInfo[uid];
+    if (info == null) return null;
+    if (widget.room['owner_uid'] == uid) return const Text('Dueño de la sala');
+    final role = info['role'] as String?;
+    if (role == 'moderator') return const Text('Moderador');
+    if (role == 'owner') return const Text('Dueño de la sala');
+    final feat = info['featured_until'] as String?;
+    if (feat != null) {
+      final t = DateTime.tryParse(feat);
+      if (t != null && t.isAfter(DateTime.now())) {
+        return const Text('Destacado');
+      }
+    }
+    return null;
+  }
+
+  static const _actionLabels = {
+    'mute': 'silenció a',
+    'unmute': 'quitó el silencio a',
+    'ban': 'baneó a',
+    'unban': 'quitó el baneo a',
+    'kick': 'expulsó a',
+    'feature': 'destacó a',
+    'unfeature': 'quitó el destacado a',
+    'role': 'cambió el rol de',
+  };
+
+  /// Panel de moderación de la sala: sanciones vigentes (con opción
+  /// de levantarlas) y registro de auditoría.
+  void _showModerationPanel() {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (ctx, setSheet) {
+          Future<List<dynamic>> load() => Future.wait([
+                _svc.fetchSanctioned(_roomId),
+                _svc.fetchModActions(_roomId),
+              ]);
+          return DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: 0.65,
+            builder: (_, scroll) => FutureBuilder<List<dynamic>>(
+              future: load(),
+              builder: (ctx, snap) {
+                if (!snap.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final sanctioned =
+                    snap.data![0] as List<Map<String, dynamic>>;
+                final actions = snap.data![1] as List<Map<String, dynamic>>;
+                return ListView(
+                  controller: scroll,
+                  padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
+                  children: [
+                    const Text('Moderación de la sala',
+                        style: TextStyle(
+                            fontSize: 17, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 16),
+                    const Text('Sanciones vigentes',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 6),
+                    if (sanctioned.isEmpty)
+                      const Text('Ninguna. La sala está tranquila.'),
+                    for (final s in sanctioned)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(
+                            '${(s['member'] as Map?)?['nickname'] ?? '···'}'),
+                        subtitle: Text(s['banned_at'] != null
+                            ? 'Baneado de la sala'
+                            : 'Silenciado (sanción vigente)'),
+                        trailing: TextButton(
+                          child: Text(s['banned_at'] != null
+                              ? 'Quitar baneo'
+                              : 'Quitar silencio'),
+                          onPressed: () async {
+                            await _svc.moderateMember(
+                              roomId: _roomId,
+                              targetUid: s['uid'] as String,
+                              action:
+                                  s['banned_at'] != null ? 'unban' : 'unmute',
+                            );
+                            setSheet(() {});
+                          },
+                        ),
+                      ),
+                    const SizedBox(height: 16),
+                    const Text('Registro de acciones',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 6),
+                    if (actions.isEmpty)
+                      const Text('Todavía no hay acciones registradas.'),
+                    for (final a in actions)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 3),
+                        child: Text(
+                          '${(a['actor'] as Map?)?['nickname'] ?? '···'} '
+                          '${_actionLabels[a['action']] ?? a['action']} '
+                          '${(a['target'] as Map?)?['nickname'] ?? '···'}'
+                          '${a['detail'] != null ? ' (${a['detail']})' : ''}',
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   void _showOccupants() {
     showModalBottomSheet(
       context: context,
@@ -345,6 +495,7 @@ class _ChatPageState extends State<ChatPage> {
                 leading: const Icon(Icons.circle,
                     size: 10, color: OneChatColors.primary),
                 title: Text('${o['nickname'] ?? ''}'),
+                subtitle: _occupantBadge(o['uid'] as String?),
                 onTap: () async {
                   Navigator.pop(context);
                   final uid = o['uid'] as String?;
@@ -355,7 +506,9 @@ class _ChatPageState extends State<ChatPage> {
                         profile: p,
                         roomId: _roomId,
                         onWhisper: _startWhisper,
-                        onPrivateMessage: _startDm);
+                        onPrivateMessage: _startDm,
+                        canModerate: _canModerate,
+                        canManageRoles: _canManageRoles);
                   }
                 },
               ),
@@ -367,6 +520,38 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_iAmBanned) {
+      return Scaffold(
+        appBar: AppBar(title: Text(widget.room['name'] as String)),
+        body: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.gavel, size: 44, color: Colors.redAccent),
+              const SizedBox(height: 16),
+              const Text(
+                'Estás baneado de esta sala',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'La moderación de la sala te retiró el acceso. '
+                'Puedes seguir usando el resto de ONEchat.',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Volver a las salas'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    final mutedUntil = _myMutedUntil;
     return Scaffold(
       appBar: AppBar(
         title: Column(
@@ -382,6 +567,12 @@ class _ChatPageState extends State<ChatPage> {
           ],
         ),
         actions: [
+          if (_canModerate)
+            IconButton(
+              icon: const Icon(Icons.shield_outlined),
+              tooltip: 'Moderación de la sala',
+              onPressed: _showModerationPanel,
+            ),
           IconButton(
             icon: const Icon(Icons.people_outline),
             tooltip: 'Quién está en la sala',
@@ -434,7 +625,9 @@ class _ChatPageState extends State<ChatPage> {
                                     profile: p,
                                     roomId: _roomId,
                                     onWhisper: _startWhisper,
-                                    onPrivateMessage: _startDm),
+                                    onPrivateMessage: _startDm,
+                                    canModerate: _canModerate,
+                                    canManageRoles: _canManageRoles),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(vertical: 4),
                               child: RichText(
@@ -501,6 +694,28 @@ class _ChatPageState extends State<ChatPage> {
                 ],
               ),
             ),
+          if (mutedUntil != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: Colors.orange.withValues(alpha: 0.15),
+              child: Row(
+                children: [
+                  const Icon(Icons.volume_off_outlined,
+                      size: 16, color: Colors.orangeAccent),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Estás silenciado en esta sala hasta las '
+                      '${mutedUntil.toLocal().hour.toString().padLeft(2, '0')}:'
+                      '${mutedUntil.toLocal().minute.toString().padLeft(2, '0')}. '
+                      'Puedes leer, pero no escribir.',
+                      style: const TextStyle(color: Colors.orangeAccent),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           SafeArea(
             top: false,
             child: Padding(
@@ -510,18 +725,21 @@ class _ChatPageState extends State<ChatPage> {
                   Expanded(
                     child: TextField(
                       controller: _input,
+                      enabled: mutedUntil == null,
                       textInputAction: TextInputAction.send,
                       onSubmitted: (_) => _send(),
                       decoration: InputDecoration(
-                        hintText: _whisperTo != null
-                            ? 'Escribe un susurro…'
-                            : 'Escribe un mensaje… (@nickname menciona)',
+                        hintText: mutedUntil != null
+                            ? 'Estás silenciado…'
+                            : _whisperTo != null
+                                ? 'Escribe un susurro…'
+                                : 'Escribe un mensaje… (@nickname menciona)',
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
                   IconButton.filled(
-                    onPressed: _sending ? null : _send,
+                    onPressed: _sending || mutedUntil != null ? null : _send,
                     icon: const Icon(Icons.send),
                     tooltip: 'Enviar',
                   ),
