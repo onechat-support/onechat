@@ -107,3 +107,45 @@
   Reenviar» (auth.resend).
 - Pendiente pre-lanzamiento: configurar un servicio de correo real
   (SMTP propio) — el integrado es solo para pruebas.
+
+## Correo propio (SMTP): en configuración (2026-11-23, delegado por Mario)
+- Decisión: Brevo (gratuito, 300 correos/día) como SMTP de Supabase
+  Auth; el remitente integrado (2/hora) queda reemplazado. Con SMTP
+  propio el límite de Supabase parte en 30/hora y se sube a 300/hora.
+- Remitente interino: djserver22@gmail.com (nombre «ONEchat»).
+  Antes del lanzamiento público conviene un dominio propio como
+  remitente (decisión y compra de Mario).
+- El plan Pro de Supabase NO cambia el límite de correo: el tope es
+  del remitente integrado, no del plan.
+
+## Correo propio (Brevo): CONFIGURADO (2026-11-23)
+- Cuenta Brevo Free creada con Google (djserver22@gmail.com),
+  organización «ONEchat», dirección de Las Vegas, NV facilitada por
+  Mario; teléfono verificado por SMS. Plan Free: 300 correos/día.
+- Remitente verificado y predeterminado: «ONEchat»
+  <djserver22@gmail.com>. Clave SMTP generada (hay una segunda clave
+  sin usar en Brevo: pendiente que Mario decida borrarla).
+- Supabase: SMTP personalizado activo (smtp-relay.brevo.com:587) y
+  límite de correos subido de 30 a 300/hora.
+- Verificación real: dos registros de prueba seguidos (ZethSmtp1 y
+  ZethSmtp2) enviaron su confirmación al instante; con el remitente
+  integrado habrían chocado con el tope de 2/hora.
+- Nota de entregabilidad: el remitente es una dirección Gmail (sin
+  dominio propio ni DKIM); para el lanzamiento público conviene un
+  dominio propio como remitente.
+
+## Acceso unificado con nickname (2026-11-23, pedido de Mario)
+- Mario pidió eliminar el acceso por correo: la pantalla de entrada
+  solo pide el nickname. Si es registrado, ahí mismo se habilita la
+  contraseña y se entra con nickname + clave; el correo queda solo
+  para el registro y la recuperación.
+- Piezas: función nickname_status (v1.4) que dice registered/guest/
+  free sin exponer correos; Edge Function «login-with-nickname» que
+  resuelve el correo internamente (service role) y devuelve la
+  sesión; la app ya no tiene pantalla de inicio de sesión por correo
+  (la recuperación y el reenvío de confirmación viven en el paso de
+  contraseña, pidiendo el correo solo para enviar el mensaje).
+- Migración v1.5: grants a service_role (las tablas creadas por SQL
+  no lo incluían; sin eso la función recibía «permission denied»).
+- Verificado por API: nickname+clave correctos devuelven sesión
+  válida; clave mala e invitado, rechazados.

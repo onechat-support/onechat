@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Traduce los errores de autenticación a lenguaje claro para el
@@ -145,6 +147,42 @@ class OnechatService {
   /// Reenvía el correo de confirmación de registro.
   Future<void> resendConfirmation(String email) =>
       _db.auth.resend(type: OtpType.signup, email: email);
+
+  /// Envía el correo para restablecer la contraseña.
+  Future<void> recoverPassword(String email) => _db.auth.resetPasswordForEmail(
+        email,
+        redirectTo: 'https://onechat-support.github.io/onechat/',
+      );
+
+  /// Estado de un nickname para el acceso unificado:
+  /// 'registered' | 'guest' | 'free'. No expone ningún correo.
+  Future<String> nicknameStatus(String nickname) async {
+    final r =
+        await _db.rpc('nickname_status', params: {'p_nickname': nickname});
+    return r as String;
+  }
+
+  /// Acceso con nickname + contraseña (el correo vive solo en el
+  /// registro): una función del servidor resuelve el correo sin
+  /// exponerlo y devuelve la sesión.
+  Future<Map<String, dynamic>?> loginWithNickname(
+      String nickname, String password) async {
+    try {
+      final res = await _db.functions.invoke(
+        'login-with-nickname',
+        body: {'nickname': nickname, 'password': password},
+      );
+      final data = res.data;
+      if (data is Map && data['session'] is Map) {
+        await _db.auth.recoverSession(
+            jsonEncode(Map<String, dynamic>.from(data['session'] as Map)));
+        return await fetchMyProfile();
+      }
+      throw Exception('Nickname o contraseña incorrectos.');
+    } on FunctionException {
+      throw Exception('Nickname o contraseña incorrectos.');
+    }
+  }
 
   Future<Map<String, dynamic>?> fetchMyProfile() async {
     final uid = myUid;

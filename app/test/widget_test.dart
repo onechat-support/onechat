@@ -13,7 +13,9 @@ void main() {
     expect(find.text('ONEchat'), findsOneWidget);
     expect(find.text('CHATEAR DIRECTAMENTE'), findsOneWidget);
     expect(find.text('Crear cuenta'), findsOneWidget);
-    expect(find.text('Iniciar sesión'), findsOneWidget);
+    // El acceso es unificado: ya no existe «Iniciar sesión» aparte;
+    // el nickname registrado pide la contraseña en esta misma pantalla.
+    expect(find.text('Iniciar sesión'), findsNothing);
     expect(find.byType(TextField), findsOneWidget);
   });
 }
