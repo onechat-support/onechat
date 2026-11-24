@@ -1,4 +1,5 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'chat_page.dart';
 import 'dm_pages.dart';
@@ -27,6 +28,11 @@ class _HomePageState extends State<HomePage> {
   // La Sala General es la puerta de entrada: primera pestaña y
   // chat abierto al entrar. Su fila se busca por slug al iniciar.
   Map<String, dynamic>? _generalRoom;
+  Map<String, dynamic>? _ayudaRoom;
+
+  bool get _isStaff =>
+      _profile['global_role'] == 'staff' ||
+      _profile['global_role'] == 'owner';
   bool _generalFailed = false;
   final _statusKey = GlobalKey<_StatusTabState>();
 
@@ -44,9 +50,11 @@ class _HomePageState extends State<HomePage> {
     try {
       final rooms = await _svc.fetchRooms();
       final general = rooms.where((r) => r['slug'] == 'general').firstOrNull;
+      final ayuda = rooms.where((r) => r['slug'] == 'ayuda').firstOrNull;
       if (!mounted) return;
       setState(() {
         _generalRoom = general;
+        _ayudaRoom = ayuda;
         _generalFailed = general == null;
       });
     } catch (_) {
@@ -78,6 +86,9 @@ class _HomePageState extends State<HomePage> {
       myProfile: _profile,
       embedded: true,
       onExit: () => setState(() => _tab = 1),
+      extraActions: (_isStaff && _ayudaRoom != null)
+          ? [_StaffHelpButton(room: _ayudaRoom!, myProfile: _profile)]
+          : null,
     );
   }
 
@@ -125,6 +136,9 @@ class _HomePageState extends State<HomePage> {
                       color: OneChatColors.primary,
                       fontWeight: FontWeight.w800)),
               actions: [
+                if (_isStaff && _ayudaRoom != null)
+                  _StaffHelpButton(
+                      room: _ayudaRoom!, myProfile: _profile),
                 Padding(
                   padding: const EdgeInsets.only(right: 14),
                   child: Center(
@@ -643,6 +657,81 @@ class _ProfileTabState extends State<_ProfileTab> {
           label: Text(t('profile.signOut')),
         ),
       ],
+    );
+  }
+}
+
+/// Icono HUD de la sala Ayuda, SOLO para el Staff (y el dueño):
+/// lleva la cuenta en vivo de mensajes de usuarios sin leer en
+/// Ayuda y entra directo a la sala. El Staff queda así «siempre
+/// presente» en Ayuda sin tener que estar dentro de la sala.
+class _StaffHelpButton extends StatefulWidget {
+  const _StaffHelpButton({required this.room, required this.myProfile});
+  final Map<String, dynamic> room;
+  final Map<String, dynamic> myProfile;
+
+  @override
+  State<_StaffHelpButton> createState() => _StaffHelpButtonState();
+}
+
+class _StaffHelpButtonState extends State<_StaffHelpButton> {
+  final _svc = OnechatService();
+  int _unread = 0;
+  RealtimeChannel? _channel;
+
+  String get _roomId => widget.room['id'] as String;
+
+  @override
+  void initState() {
+    super.initState();
+    _init();
+  }
+
+  Future<void> _init() async {
+    // Membresía silenciosa: el marcador de lectura vive en mi fila.
+    await _svc.joinRoom(_roomId);
+    await _reload();
+    _channel = _svc.subscribeMessages(_roomId, (_) => _reload());
+  }
+
+  Future<void> _reload() async {
+    final n = await _svc.helpUnreadCount(_roomId);
+    if (mounted) setState(() => _unread = n);
+  }
+
+  @override
+  void dispose() {
+    final ch = _channel;
+    if (ch != null) _svc.unsubscribe(ch);
+    super.dispose();
+  }
+
+  Future<void> _open() async {
+    await _svc.markHelpRead(_roomId);
+    if (mounted) setState(() => _unread = 0);
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            ChatPage(room: widget.room, myProfile: widget.myProfile),
+      ),
+    );
+    // Al salir, lo que llegó mientras estaba dentro también
+    // quedó visto por el Staff.
+    await _svc.markHelpRead(_roomId);
+    await _reload();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: t('help.staffTooltip'),
+      onPressed: _open,
+      icon: Badge(
+        isLabelVisible: _unread > 0,
+        label: Text('$_unread'),
+        child: const Icon(Icons.support_agent),
+      ),
     );
   }
 }

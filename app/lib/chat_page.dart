@@ -15,9 +15,14 @@ class ChatPage extends StatefulWidget {
       required this.room,
       required this.myProfile,
       this.embedded = false,
-      this.onExit});
+      this.onExit,
+      this.extraActions});
   final Map<String, dynamic> room;
   final Map<String, dynamic> myProfile;
+
+  /// Acciones extra en la barra (p. ej. el icono de Ayuda del Staff
+  /// cuando esta sala es la pestaña General).
+  final List<Widget>? extraActions;
 
   /// Incrustada como pestaña (la Sala General al entrar): no es una
   /// ruta, así que «salir» cambia de pestaña en vez de hacer pop.
@@ -641,6 +646,7 @@ class _ChatPageState extends State<ChatPage> {
             tooltip: t('chat.occupantsTooltip'),
             onPressed: _showOccupants,
           ),
+          ...?widget.extraActions,
         ],
       ),
       body: Column(

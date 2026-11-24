@@ -790,6 +790,49 @@ class OnechatService {
     throw Exception('translate_bad_response');
   }
 
+  // ---------- Ayuda / Staff (pulido tras Etapa 5) ----------
+
+  /// Uids del equipo: dueño global y staff.
+  Future<Set<String>> staffUids() async {
+    final rows = await _db
+        .from('profiles')
+        .select('uid')
+        .inFilter('global_role', ['staff', 'owner']);
+    return {for (final r in rows) r['uid'] as String};
+  }
+
+  /// Mensajes de USUARIOS sin leer en la sala Ayuda para mí: los
+  /// escritos por no-Staff después de mi marcador de lectura.
+  Future<int> helpUnreadCount(String roomId) async {
+    final member = await memberState(roomId, myUid!);
+    final marker = (member?['last_read_at'] as String?) ??
+        (member?['joined_at'] as String?) ??
+        '1970-01-01T00:00:00Z';
+    final staff = await staffUids();
+    final rows = await _db
+        .from('room_messages')
+        .select('sender_uid')
+        .eq('room_id', roomId)
+        .gt('created_at', marker)
+        .order('created_at')
+        .limit(300);
+    var n = 0;
+    for (final r in rows) {
+      final sender = r['sender_uid'] as String?;
+      if (sender != null && sender != myUid && !staff.contains(sender)) n++;
+    }
+    return n;
+  }
+
+  /// Marco la sala como leída hasta ahora (mi propia fila).
+  Future<void> markHelpRead(String roomId) async {
+    await _db
+        .from('room_members')
+        .update({'last_read_at': DateTime.now().toUtc().toIso8601String()})
+        .eq('room_id', roomId)
+        .eq('uid', myUid!);
+  }
+
   Future<void> updateMyProfile(
       {String? bio,
       String? colorHex,
