@@ -157,10 +157,17 @@ class _HomePageState extends State<HomePage> {
       appBar: _tab == 0
           ? null
           : AppBar(
-              title: const Text('ONEchat',
-                  style: TextStyle(
-                      color: OneChatColors.primary,
-                      fontWeight: FontWeight.w800)),
+              // La marca en la barra: el logo oficial (Mario,
+              // 2026-11-24), presente en todo el interior.
+              title: ClipRRect(
+                borderRadius: BorderRadius.circular(7),
+                child: Image.asset(
+                  'assets/logo_onechat.jpg',
+                  height: 32,
+                  fit: BoxFit.fitHeight,
+                  semanticLabel: 'ONEchat',
+                ),
+              ),
               actions: [
                 if (_isStaff && _ayudaRoom != null)
                   _StaffHelpButton(

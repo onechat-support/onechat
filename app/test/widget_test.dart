@@ -10,7 +10,12 @@ void main() {
       (WidgetTester tester) async {
     await tester.pumpWidget(const OneChatApp());
 
-    expect(find.text('ONEchat'), findsOneWidget);
+    // La marca es el logo oficial (imagen con etiqueta «ONEchat»).
+    expect(
+      find.byWidgetPredicate(
+          (w) => w is Image && w.semanticLabel == 'ONEchat'),
+      findsOneWidget,
+    );
     expect(find.text('CHATEAR DIRECTAMENTE'), findsOneWidget);
     expect(find.text('Crear cuenta'), findsOneWidget);
     // El acceso es unificado: ya no existe «Iniciar sesión» aparte;
