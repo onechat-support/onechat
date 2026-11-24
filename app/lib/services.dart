@@ -790,6 +790,71 @@ class OnechatService {
     throw Exception('translate_bad_response');
   }
 
+  // ---------- Juegos en privados: Gato 1 vs 1 ----------
+
+  /// Invita al otro a jugar (o devuelve la partida vigente).
+  Future<String?> inviteGame(String otherUid) async {
+    final r = await _db.rpc('game_invite', params: {'p_other': otherUid});
+    return r as String?;
+  }
+
+  Future<bool> respondGame(String gameId, bool accept) async {
+    final r = await _db.rpc('game_respond',
+        params: {'p_game': gameId, 'p_accept': accept});
+    return r == true;
+  }
+
+  /// Juega una celda (0-8). Devuelve el resultado o null si el
+  /// servidor rechazó la jugada (no era tu turno, celda ocupada…).
+  Future<Map<String, dynamic>?> moveGame(String gameId, int cell) async {
+    final r = await _db
+        .rpc('game_move', params: {'p_game': gameId, 'p_cell': cell});
+    return r == null ? null : Map<String, dynamic>.from(r as Map);
+  }
+
+  Future<bool> resignGame(String gameId) async {
+    final r = await _db.rpc('game_resign', params: {'p_game': gameId});
+    return r == true;
+  }
+
+  Future<Map<String, dynamic>?> fetchGameById(String gameId) async {
+    final rows =
+        await _db.from('games').select().eq('id', gameId).limit(1);
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  /// La partida de Gato más reciente entre el otro y yo.
+  Future<Map<String, dynamic>?> fetchPairGame(String otherUid) async {
+    final me = myUid!;
+    final rows = await _db
+        .from('games')
+        .select()
+        .eq('game_type', 'gato')
+        .or('and(player_a.eq.$me,player_b.eq.$otherUid),and(player_a.eq.$otherUid,player_b.eq.$me)')
+        .order('created_at', ascending: false)
+        .limit(1);
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  RealtimeChannel subscribeGame(
+      String gameId, void Function(Map<String, dynamic> row) onUpdate) {
+    final channel = _db.channel('game-$gameId');
+    channel
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'games',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'id',
+            value: gameId,
+          ),
+          callback: (payload) => onUpdate(payload.newRecord),
+        )
+        .subscribe();
+    return channel;
+  }
+
   // ---------- Ayuda / Staff (pulido tras Etapa 5) ----------
 
   /// Uids del equipo: dueño global y staff.

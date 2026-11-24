@@ -338,6 +338,8 @@ class _StatusTabState extends State<_StatusTab> {
         return t('status.favoriteIn');
       case 'moderation':
         return t('status.moderation');
+      case 'game_invite':
+        return t('status.gameInvite');
       default:
         return t('status.system');
     }

@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'services.dart';
 import 'strings.dart';
+import 'theme.dart';
 import 'user_sheet.dart';
 
 String _when(String? iso) {
@@ -166,6 +167,12 @@ class _DmChatPageState extends State<DmChatPage> {
   bool _loading = true;
   bool _sending = false;
 
+  // Gato 1 vs 1 dentro del privado
+  Map<String, dynamic>? _game;
+  RealtimeChannel? _gameChannel;
+  bool _gameBusy = false;
+  final Set<String> _dismissedGames = {};
+
   String get _otherUid => widget.other['uid'] as String;
 
   @override
@@ -187,7 +194,9 @@ class _DmChatPageState extends State<DmChatPage> {
       _loading = false;
     });
     _jumpToBottom();
+    _loadGame();
     _channel = _svc.subscribeDirectMessages(widget.conversationId, (row) {
+      _loadGame();
       final id = row['id'];
       if (id is int && _knownIds.contains(id)) return;
       if (!mounted) return;
@@ -255,6 +264,8 @@ class _DmChatPageState extends State<DmChatPage> {
   void dispose() {
     final ch = _channel;
     if (ch != null) _svc.unsubscribe(ch);
+    final gch = _gameChannel;
+    if (gch != null) _svc.unsubscribe(gch);
     _input.dispose();
     _scroll.dispose();
     super.dispose();
@@ -298,6 +309,245 @@ class _DmChatPageState extends State<DmChatPage> {
     } finally {
       if (mounted) setState(() => _sending = false);
     }
+  }
+
+  Future<void> _loadGame() async {
+    final g = await _svc.fetchPairGame(_otherUid);
+    if (!mounted) return;
+    if (g == null || g['status'] == 'declined' ||
+        _dismissedGames.contains(g['id'])) {
+      if (_game != null) setState(() => _game = null);
+      return;
+    }
+    setState(() => _game = g);
+    _subscribeGame(g['id'] as String);
+  }
+
+  void _subscribeGame(String gameId) {
+    if (_gameChannel != null) return;
+    _gameChannel = _svc.subscribeGame(gameId, (row) {
+      if (!mounted) return;
+      setState(() => _game = {...?_game, ...row});
+    });
+  }
+
+  Future<void> _refreshGame() async {
+    final id = _game?['id'] as String?;
+    if (id == null) return;
+    final g = await _svc.fetchGameById(id);
+    if (!mounted || g == null) return;
+    if (g['status'] == 'declined') {
+      setState(() => _game = null);
+    } else {
+      setState(() => _game = g);
+    }
+  }
+
+  Future<void> _invite() async {
+    setState(() => _gameBusy = true);
+    try {
+      final id = await _svc.inviteGame(_otherUid);
+      if (id != null) {
+        final g = await _svc.fetchGameById(id);
+        if (mounted && g != null) {
+          setState(() => _game = g);
+          _subscribeGame(id);
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _gameBusy = false);
+    }
+  }
+
+  Future<void> _respond(bool accept) async {
+    final id = _game?['id'] as String?;
+    if (id == null) return;
+    setState(() => _gameBusy = true);
+    try {
+      await _svc.respondGame(id, accept);
+      await _refreshGame();
+    } finally {
+      if (mounted) setState(() => _gameBusy = false);
+    }
+  }
+
+  Future<void> _move(int cell) async {
+    final g = _game;
+    if (g == null || _gameBusy) return;
+    if (g['turn_uid'] != _svc.myUid) return;
+    setState(() => _gameBusy = true);
+    try {
+      final r = await _svc.moveGame(g['id'] as String, cell);
+      if (r != null) await _refreshGame();
+    } finally {
+      if (mounted) setState(() => _gameBusy = false);
+    }
+  }
+
+  Future<void> _resign() async {
+    final id = _game?['id'] as String?;
+    if (id == null) return;
+    await _svc.resignGame(id);
+    await _refreshGame();
+  }
+
+  Widget _gameArea() {
+    final g = _game;
+    final otherNick = widget.other['nickname'] as String;
+    if (g == null) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            onPressed: _gameBusy ? null : _invite,
+            icon: const Icon(Icons.grid_3x3, size: 18),
+            label: Text(t('game.play')),
+          ),
+        ),
+      );
+    }
+    final me = _svc.myUid;
+    final iAmA = g['player_a'] == me;
+    final myMark = iAmA ? 'X' : 'O';
+    final status = g['status'] as String;
+    final board = (g['state']?['board'] as List?) ?? const [];
+    Widget header;
+    List<Widget> actions = [];
+    if (status == 'invited') {
+      if (iAmA) {
+        header = Text(t('game.waiting'));
+        actions = [
+          TextButton(
+            onPressed: _gameBusy ? null : () => _respond(false),
+            child: Text(t('game.cancel')),
+          ),
+        ];
+      } else {
+        header = Text(t('game.invitedYou', {'nick': otherNick}),
+            style: const TextStyle(fontWeight: FontWeight.bold));
+        actions = [
+          FilledButton(
+            onPressed: _gameBusy ? null : () => _respond(true),
+            child: Text(t('game.accept')),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton(
+            onPressed: _gameBusy ? null : () => _respond(false),
+            child: Text(t('game.decline')),
+          ),
+        ];
+      }
+      return _gameCard(header, actions, null);
+    }
+    if (status == 'active') {
+      final myTurn = g['turn_uid'] == me;
+      header = Text(
+        myTurn
+            ? '${t('game.yourTurn')} · ${t('game.youAre', {'mark': myMark})}'
+            : t('game.theirTurn', {'nick': otherNick}),
+        style: const TextStyle(fontWeight: FontWeight.bold),
+      );
+      actions = [
+        TextButton(
+          onPressed: _gameBusy ? null : _resign,
+          child: Text(t('game.resign')),
+        ),
+      ];
+      return _gameCard(header, actions, board);
+    }
+    // finished
+    final winner = g['winner_uid'] as String?;
+    final result = winner == null
+        ? t('game.draw')
+        : winner == me
+            ? t('game.youWon')
+            : t('game.theyWon', {'nick': otherNick});
+    header = Text(result,
+        style: const TextStyle(
+            fontWeight: FontWeight.bold, color: OneChatColors.primary));
+    actions = [
+      FilledButton(
+        onPressed: _gameBusy ? null : _invite,
+        child: Text(t('game.rematch')),
+      ),
+      const SizedBox(width: 8),
+      OutlinedButton(
+        onPressed: () => setState(() {
+          _dismissedGames.add(g['id'] as String);
+          _game = null;
+        }),
+        child: Text(t('game.close')),
+      ),
+    ];
+    return _gameCard(header, actions, board);
+  }
+
+  Widget _gameCard(Widget header, List<Widget> actions, List? board) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          header,
+          if (board != null) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: 168,
+              child: GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate:
+                    const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 4,
+                  mainAxisSpacing: 4,
+                ),
+                itemCount: 9,
+                itemBuilder: (context, i) {
+                  final v = i < board.length ? board[i] : null;
+                  final g = _game!;
+                  final canTap = v == null &&
+                      g['status'] == 'active' &&
+                      g['turn_uid'] == _svc.myUid &&
+                      !_gameBusy;
+                  return InkWell(
+                    onTap: canTap ? () => _move(i) : null,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surface,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        v?.toString() ?? '',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: v == 'X'
+                              ? OneChatColors.primary
+                              : OneChatColors.secondary,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: actions,
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -380,6 +630,7 @@ class _DmChatPageState extends State<DmChatPage> {
                         },
                       ),
           ),
+          _gameArea(),
           SafeArea(
             top: false,
             child: Padding(
