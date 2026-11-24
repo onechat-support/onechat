@@ -331,6 +331,27 @@ class OnechatService {
     return rows.isEmpty ? null : rows.first;
   }
 
+  /// Mis notificaciones en vivo (para los contadores de la barra
+  /// principal: que avise sin tener que entrar a la pestaña).
+  RealtimeChannel subscribeNotifications(
+      void Function(Map<String, dynamic> row) onInsert) {
+    final channel = _db.channel('notif-$myUid');
+    channel
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'notifications',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'uid',
+            value: myUid,
+          ),
+          callback: (payload) => onInsert(payload.newRecord),
+        )
+        .subscribe();
+    return channel;
+  }
+
   /// Avisos en vivo de privados nuevos (la RLS limita la suscripción
   /// a las conversaciones donde participo).
   RealtimeChannel subscribeInbox(void Function(Map<String, dynamic> row) onInsert) {

@@ -36,6 +36,8 @@ class _HomePageState extends State<HomePage> {
   bool _generalFailed = false;
   final _statusKey = GlobalKey<_StatusTabState>();
   final _convsKey = GlobalKey<ConversationsTabState>();
+  RealtimeChannel? _notifChannel;
+  RealtimeChannel? _inboxChannel;
 
   @override
   void initState() {
@@ -45,6 +47,27 @@ class _HomePageState extends State<HomePage> {
     _svc.touchLastSeen();
     _refreshUnread();
     _loadGeneral();
+    // Avisos en vivo: si me escriben o me llega una notificación
+    // estando en cualquier pestaña, los contadores se actualizan
+    // solos (antes solo cambiaban al entrar a Privados o Status).
+    _notifChannel = _svc.subscribeNotifications((_) {
+      if (!mounted) return;
+      _refreshUnread();
+      if (_tab == 3) _statusKey.currentState?.reload();
+    });
+    _inboxChannel = _svc.subscribeInbox((row) {
+      if (!mounted || row['sender_uid'] == _svc.myUid) return;
+      _refreshUnread();
+    });
+  }
+
+  @override
+  void dispose() {
+    final n = _notifChannel;
+    if (n != null) _svc.unsubscribe(n);
+    final i = _inboxChannel;
+    if (i != null) _svc.unsubscribe(i);
+    super.dispose();
   }
 
   Future<void> _loadGeneral() async {

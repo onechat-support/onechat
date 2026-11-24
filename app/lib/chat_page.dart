@@ -152,6 +152,7 @@ class _ChatPageState extends State<ChatPage> {
         }
       }
       if (!mounted) return;
+      if (id is int && _knownWhisperIds.contains(id)) return;
       setState(() {
         _messages.add(_prepareWhisper(row));
         if (id is int) _knownWhisperIds.add(id);
@@ -169,6 +170,7 @@ class _ChatPageState extends State<ChatPage> {
         if (p != null) _profiles[sender] = p;
       }
       if (!mounted) return;
+      if (id is int && _knownIds.contains(id)) return;
       setState(() {
         _messages.add(row);
         if (id is int) _knownIds.add(id);
@@ -260,8 +262,18 @@ class _ChatPageState extends State<ChatPage> {
       if (realId is int) _knownWhisperIds.add(realId);
       if (!mounted) return;
       setState(() {
-        final i = _messages.indexOf(temp);
-        if (i >= 0) _messages[i] = {...inserted, 'is_whisper': true};
+        // Si el eco en tiempo real llegó antes que la respuesta del
+        // servidor, la fila real ya está en la lista: se quita el
+        // temporal en vez de reemplazarlo (sin esto, el emisor veía
+        // su propio mensaje duplicado, a veces sí y a veces no).
+        final dup = _messages
+            .indexWhere((m) => m['id'] == realId && !identical(m, temp));
+        if (dup >= 0) {
+          _messages.remove(temp);
+        } else {
+          final i = _messages.indexOf(temp);
+          if (i >= 0) _messages[i] = {...inserted, 'is_whisper': true};
+        }
       });
     } catch (e) {
       if (!mounted) return;
@@ -309,8 +321,18 @@ class _ChatPageState extends State<ChatPage> {
       if (realId is int) _knownIds.add(realId);
       if (!mounted) return;
       setState(() {
-        final i = _messages.indexOf(temp);
-        if (i >= 0) _messages[i] = inserted;
+        // Si el eco en tiempo real llegó antes que la respuesta del
+        // servidor, la fila real ya está en la lista: se quita el
+        // temporal en vez de reemplazarlo (sin esto, el emisor veía
+        // su propio mensaje duplicado, a veces sí y a veces no).
+        final dup = _messages
+            .indexWhere((m) => m['id'] == realId && !identical(m, temp));
+        if (dup >= 0) {
+          _messages.remove(temp);
+        } else {
+          final i = _messages.indexOf(temp);
+          if (i >= 0) _messages[i] = inserted;
+        }
       });
     } catch (e) {
       if (!mounted) return;

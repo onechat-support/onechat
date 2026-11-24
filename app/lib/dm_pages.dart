@@ -318,8 +318,18 @@ class _DmChatPageState extends State<DmChatPage> {
       if (realId is int) _knownIds.add(realId);
       if (!mounted) return;
       setState(() {
-        final i = _messages.indexOf(temp);
-        if (i >= 0) _messages[i] = inserted;
+        // Si el eco en tiempo real llegó antes que la respuesta del
+        // servidor, la fila real ya está en la lista: se quita el
+        // temporal en vez de reemplazarlo (sin esto, el emisor veía
+        // su propio mensaje duplicado, a veces sí y a veces no).
+        final dup = _messages
+            .indexWhere((m) => m['id'] == realId && !identical(m, temp));
+        if (dup >= 0) {
+          _messages.remove(temp);
+        } else {
+          final i = _messages.indexOf(temp);
+          if (i >= 0) _messages[i] = inserted;
+        }
       });
     } catch (e) {
       if (!mounted) return;
