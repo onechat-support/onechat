@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'services.dart';
+import 'strings.dart';
 import 'user_sheet.dart';
 
 String _when(String? iso) {
@@ -57,15 +58,16 @@ class _ConversationsTabState extends State<ConversationsTab> {
         }
         if (snap.hasError) {
           return Center(
-              child: Text('Error al cargar privados: ${snap.error}'));
+              child:
+                  Text(t('dm.errorLoading', {'e': '${snap.error}'})));
         }
         final convs = snap.data ?? [];
         if (convs.isEmpty) {
-          return const Center(
+          return Center(
             child: Padding(
-              padding: EdgeInsets.all(28),
+              padding: const EdgeInsets.all(28),
               child: Text(
-                'Aún no tienes conversaciones privadas.\nEntra a una sala, toca el nombre de alguien y elige «Mensaje privado».',
+                t('dm.empty'),
                 textAlign: TextAlign.center,
               ),
             ),
@@ -105,8 +107,8 @@ class _ConversationsTabState extends State<ConversationsTab> {
                     )),
                 subtitle: Text(
                   last == null
-                      ? 'Conversación creada'
-                      : '${lastMine ? 'Tú: ' : ''}${last['body'] ?? ''}',
+                      ? t('dm.created')
+                      : '${lastMine ? t('dm.youPrefix') : ''}${last['body'] ?? ''}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -159,6 +161,7 @@ class _DmChatPageState extends State<DmChatPage> {
   final _scroll = ScrollController();
   final List<Map<String, dynamic>> _messages = [];
   final Set<int> _knownIds = {};
+  final Map<int, String> _translations = {};
   RealtimeChannel? _channel;
   bool _loading = true;
   bool _sending = false;
@@ -197,6 +200,47 @@ class _DmChatPageState extends State<DmChatPage> {
         _svc.markConversationRead(widget.conversationId);
       }
     });
+  }
+
+  /// Mantener presionado un mensaje privado: traducirlo al idioma
+  /// del perfil (o volver al original). Igual que en las salas.
+  Future<void> _translateMenu(int id, String body) async {
+    final has = _translations.containsKey(id);
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (_) => SafeArea(
+        child: ListTile(
+          leading: const Icon(Icons.translate),
+          title: Text(has ? t('chat.showOriginal') : t('chat.translate')),
+          onTap: () => Navigator.pop(context, 'go'),
+        ),
+      ),
+    );
+    if (action != 'go' || !mounted) return;
+    if (has) {
+      setState(() => _translations.remove(id));
+      return;
+    }
+    try {
+      final r = await _svc.translateText(body);
+      if (!mounted) return;
+      final detected = r['detected'] as String? ?? '';
+      if (detected == appLanguage.value) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(t('chat.alreadyYourLanguage'))),
+        );
+        return;
+      }
+      final translated = r['translated'] as String? ?? '';
+      if (translated.isEmpty) throw Exception('empty');
+      setState(() => _translations[id] = translated);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(t('chat.translateFailed'))),
+      );
+    }
   }
 
   void _jumpToBottom() {
@@ -249,7 +293,7 @@ class _DmChatPageState extends State<DmChatPage> {
       if (!mounted) return;
       setState(() => _messages.remove(temp));
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo enviar: $e')),
+        SnackBar(content: Text(t('chat.sendFailed', {'e': '$e'}))),
       );
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -268,8 +312,8 @@ class _DmChatPageState extends State<DmChatPage> {
                 style: TextStyle(
                     color:
                         nickColor(widget.other['nickname_color'] as String?))),
-            const Text('Conversación privada',
-                style: TextStyle(fontSize: 12)),
+            Text(t('dm.privateChat'),
+                style: const TextStyle(fontSize: 12)),
           ],
         ),
       ),
@@ -281,7 +325,7 @@ class _DmChatPageState extends State<DmChatPage> {
                 : _messages.isEmpty
                     ? Center(
                         child: Text(
-                            'Saluda a $otherNick: solo ustedes dos ven esta conversación.'))
+                            t('dm.greeting', {'nick': otherNick})))
                     : ListView.builder(
                         controller: _scroll,
                         padding: const EdgeInsets.symmetric(
@@ -296,7 +340,10 @@ class _DmChatPageState extends State<DmChatPage> {
                           final colorHex = isMe
                               ? widget.myProfile['nickname_color'] as String?
                               : widget.other['nickname_color'] as String?;
-                          return Padding(
+                          return GestureDetector(
+                            onLongPress: () => _translateMenu(
+                                m['id'] as int, m['body'] as String? ?? ''),
+                            child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 4),
                             child: RichText(
                               text: TextSpan(
@@ -311,14 +358,24 @@ class _DmChatPageState extends State<DmChatPage> {
                                   ),
                                   TextSpan(text: m['body'] as String? ?? ''),
                                   if (isMe)
-                                    const TextSpan(
-                                      text: '  (tú)',
-                                      style: TextStyle(
+                                    TextSpan(
+                                      text: t('chat.youSuffix'),
+                                      style: const TextStyle(
                                           fontSize: 11, color: Colors.grey),
+                                    ),
+                                  if (_translations[m['id']] != null)
+                                    TextSpan(
+                                      text:
+                                          '\n🌐 ${_translations[m['id']]}',
+                                      style: const TextStyle(
+                                          fontSize: 13,
+                                          fontStyle: FontStyle.italic,
+                                          color: Colors.grey),
                                     ),
                                 ],
                               ),
                             ),
+                          ),
                           );
                         },
                       ),
@@ -334,8 +391,8 @@ class _DmChatPageState extends State<DmChatPage> {
                       controller: _input,
                       textInputAction: TextInputAction.send,
                       onSubmitted: (_) => _send(),
-                      decoration: const InputDecoration(
-                        hintText: 'Escribe un mensaje privado…',
+                      decoration: InputDecoration(
+                        hintText: t('dm.hint'),
                       ),
                     ),
                   ),
@@ -343,7 +400,7 @@ class _DmChatPageState extends State<DmChatPage> {
                   IconButton.filled(
                     onPressed: _sending ? null : _send,
                     icon: const Icon(Icons.send),
-                    tooltip: 'Enviar',
+                    tooltip: t('chat.sendTooltip'),
                   ),
                 ],
               ),

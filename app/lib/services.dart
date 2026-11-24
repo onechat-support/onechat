@@ -2,33 +2,35 @@ import 'dart:convert';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'strings.dart';
+
 /// Traduce los errores de autenticación a lenguaje claro para el
 /// usuario (nunca se muestra el texto técnico crudo).
 String friendlyAuthError(Object e) {
-  final t = e.toString();
-  if (t.contains('over_email_send_rate_limit') ||
-      t.contains('email rate limit')) {
-    return 'Se alcanzó el límite de correos por ahora: el servicio de correo de esta etapa es muy reducido. Espera unos minutos y vuelve a intentarlo; tu nickname no se pierde.';
+  final msg = e.toString();
+  if (msg.contains('over_email_send_rate_limit') ||
+      msg.contains('email rate limit')) {
+    return t('auth.errRateLimit');
   }
-  if (t.contains('user_already_exists') ||
-      t.contains('already registered') ||
-      t.contains('already exists')) {
-    return 'Ese correo ya tiene una cuenta. Entra con tu nickname y tu contraseña; si aún no confirmaste el correo, pide el reenvío desde el paso de contraseña.';
+  if (msg.contains('user_already_exists') ||
+      msg.contains('already registered') ||
+      msg.contains('already exists')) {
+    return t('auth.errAlreadyExists');
   }
-  if (t.contains('email_not_confirmed') || t.contains('not confirmed')) {
-    return 'Tu correo aún no está confirmado. Revisa tu bandeja (y la carpeta de spam) o reenvía la confirmación.';
+  if (msg.contains('email_not_confirmed') || msg.contains('not confirmed')) {
+    return t('auth.errNotConfirmed');
   }
-  if (t.contains('invalid_credentials') ||
-      t.contains('Invalid login credentials')) {
-    return 'Correo o contraseña incorrectos.';
+  if (msg.contains('invalid_credentials') ||
+      msg.contains('Invalid login credentials')) {
+    return t('auth.errInvalidCredentials');
   }
-  if (t.contains('weak_password') || t.contains('Password should')) {
-    return 'La contraseña es muy débil: usa al menos 8 caracteres.';
+  if (msg.contains('weak_password') || msg.contains('Password should')) {
+    return t('auth.errWeakPassword');
   }
-  if (t.contains('invalid_email') || t.contains('Unable to validate email')) {
-    return 'Ese correo no parece válido. Revísalo e inténtalo de nuevo.';
+  if (msg.contains('invalid_email') || msg.contains('Unable to validate email')) {
+    return t('auth.errInvalidEmail');
   }
-  return 'Algo salió mal. Inténtalo de nuevo en un momento.';
+  return t('auth.errGeneric');
 }
 
 /// Capa de acceso a Supabase para ONEchat (Etapa 1, MVP).
@@ -47,7 +49,7 @@ class OnechatService {
 
   static String? validateNickname(String nick) {
     if (!_nickRe.hasMatch(nick)) {
-      return 'Usa de 3 a 20 caracteres: letras, números o guion bajo.';
+      return t('svc.nicknameRules');
     }
     return null;
   }
@@ -66,6 +68,7 @@ class OnechatService {
           'nickname_lower': nickname.toLowerCase(),
           'email': email,
           'is_guest': isGuest,
+          'language': appLanguage.value,
           'last_seen_at': DateTime.now().toUtc().toIso8601String(),
         })
         .select()
@@ -87,7 +90,7 @@ class OnechatService {
   Future<Map<String, dynamic>> enterAsGuest(String nickname) async {
     final res = await _db.auth.signInAnonymously();
     final user = res.user;
-    if (user == null) throw Exception('No se pudo crear la sesión de invitado.');
+    if (user == null) throw Exception(t('svc.couldNotCreateGuest'));
     try {
       return await _createProfile(uid: user.id, nickname: nickname, isGuest: true);
     } catch (e) {
@@ -99,7 +102,7 @@ class OnechatService {
               uid: user.id, nickname: nickname, isGuest: true);
         }
         await _db.auth.signOut();
-        throw Exception('Ese nickname ya está en uso. Prueba con otro.');
+        throw Exception(t('auth.nicknameTaken'));
       }
       await _db.auth.signOut();
       rethrow;
@@ -122,14 +125,14 @@ class OnechatService {
       data: {'nickname': nickname},
     );
     final user = res.user;
-    if (user == null) throw Exception('No se pudo crear la cuenta.');
+    if (user == null) throw Exception(t('svc.couldNotCreateAccount'));
     if (res.session == null) return null; // falta confirmar el correo
     try {
       return await _createProfile(
           uid: user.id, nickname: nickname, isGuest: false, email: email);
     } catch (e) {
       if (_isNicknameTaken(e)) {
-        throw Exception('Ese nickname ya está en uso. Inicia sesión y elige otro.');
+        throw Exception(t('svc.nicknameInUse'));
       }
       rethrow;
     }
@@ -184,9 +187,9 @@ class OnechatService {
             jsonEncode(Map<String, dynamic>.from(data['session'] as Map)));
         return await fetchMyProfile();
       }
-      throw Exception('Nickname o contraseña incorrectos.');
+      throw Exception(t('auth.errNicknameOrPassword'));
     } on FunctionException {
-      throw Exception('Nickname o contraseña incorrectos.');
+      throw Exception(t('auth.errNicknameOrPassword'));
     }
   }
 
@@ -775,13 +778,30 @@ class OnechatService {
     });
   }
 
+  /// Traduce un mensaje al idioma del usuario (Etapa 5, DeepL en
+  /// el servidor). Devuelve {translated, detected}.
+  Future<Map<String, dynamic>> translateText(String text) async {
+    final res = await _db.functions.invoke('translate', body: {
+      'text': text,
+      'target': appLanguage.value,
+    });
+    final data = res.data;
+    if (data is Map) return Map<String, dynamic>.from(data);
+    throw Exception('translate_bad_response');
+  }
+
   Future<void> updateMyProfile(
-      {String? bio, String? colorHex, String? themeMode, String? country}) async {
+      {String? bio,
+      String? colorHex,
+      String? themeMode,
+      String? country,
+      String? language}) async {
     final patch = <String, dynamic>{};
     if (bio != null) patch['bio'] = bio;
     if (colorHex != null) patch['nickname_color'] = colorHex;
     if (themeMode != null) patch['theme_mode'] = themeMode;
     if (country != null) patch['country'] = country;
+    if (language != null) patch['language'] = language;
     if (patch.isEmpty) return;
     await _db.from('profiles').update(patch).eq('uid', myUid!);
   }

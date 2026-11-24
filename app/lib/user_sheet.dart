@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import 'services.dart';
+import 'strings.dart';
 import 'theme.dart';
 
 Color nickColor(String? hex) {
@@ -104,15 +105,15 @@ class _UserSheetState extends State<_UserSheet> {
       final ok = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Confirmar'),
+          title: Text(t('sheet.confirmTitle')),
           content: Text(confirm),
           actions: [
             TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Cancelar')),
+                child: Text(t('sheet.cancel'))),
             FilledButton(
                 onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Sí, aplicar')),
+                child: Text(t('sheet.yesApply'))),
           ],
         ),
       );
@@ -131,8 +132,8 @@ class _UserSheetState extends State<_UserSheet> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
           content: Text(done
-              ? 'Acción de moderación aplicada.'
-              : 'No se pudo aplicar (revisa tus permisos).')),
+              ? t('sheet.modApplied')
+              : t('sheet.modFailed'))),
     );
   }
 
@@ -140,12 +141,12 @@ class _UserSheetState extends State<_UserSheet> {
     final choice = await showDialog<(int, String)>(
       context: context,
       builder: (ctx) => SimpleDialog(
-        title: Text('Silenciar a ${widget.profile['nickname']}'),
+        title: Text(t('sheet.muteTitle', {'nick': '${widget.profile['nickname']}'})),
         children: [
           for (final (mins, label) in [
-            (10, '10 minutos'),
-            (60, '1 hora'),
-            (1440, '24 horas'),
+            (10, t('sheet.dur10')),
+            (60, t('sheet.dur60')),
+            (1440, t('sheet.dur1440')),
           ])
             SimpleDialogOption(
               onPressed: () => Navigator.pop(ctx, (mins, label)),
@@ -156,7 +157,7 @@ class _UserSheetState extends State<_UserSheet> {
     );
     if (choice == null) return;
     await _moderate('mute',
-        minutes: choice.$1, detail: 'Silencio de ${choice.$2}');
+        minutes: choice.$1, detail: t('sheet.muteDetail', {'dur': choice.$2}));
   }
 
   Future<void> _setRole(String role, String label) async {
@@ -168,8 +169,9 @@ class _UserSheetState extends State<_UserSheet> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
           content: Text(done
-              ? '${widget.profile['nickname']} ahora es $label de la sala.'
-              : 'No se pudo cambiar el rol.')),
+              ? t('sheet.roleNow',
+                  {'nick': '${widget.profile['nickname']}', 'role': label})
+              : t('sheet.roleFailed'))),
     );
   }
 
@@ -188,16 +190,16 @@ class _UserSheetState extends State<_UserSheet> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Bloquear usuario'),
-        content: Text(
-            'Dejarás de ver los mensajes de ${widget.profile['nickname']}. Puedes desbloquearlo desde tu perfil.'),
+        title: Text(t('sheet.blockTitle')),
+        content: Text(t('sheet.blockBody',
+            {'nick': '${widget.profile['nickname']}'})),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancelar')),
+              child: Text(t('sheet.cancel'))),
           FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Bloquear')),
+              child: Text(t('sheet.blockAction'))),
         ],
       ),
     );
@@ -206,7 +208,7 @@ class _UserSheetState extends State<_UserSheet> {
     if (!mounted) return;
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Usuario bloqueado.')),
+      SnackBar(content: Text(t('sheet.blocked'))),
     );
   }
 
@@ -215,22 +217,22 @@ class _UserSheetState extends State<_UserSheet> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Reportar usuario'),
+        title: Text(t('sheet.reportTitle')),
         content: TextField(
           controller: reasonCtrl,
           maxLines: 3,
-          decoration: const InputDecoration(
-            labelText: 'Motivo del reporte',
-            hintText: 'Describe brevemente lo ocurrido',
+          decoration: InputDecoration(
+            labelText: t('sheet.reportReason'),
+            hintText: t('sheet.reportHint'),
           ),
         ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancelar')),
+              child: Text(t('sheet.cancel'))),
           FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Enviar reporte')),
+              child: Text(t('sheet.reportSend'))),
         ],
       ),
     );
@@ -240,7 +242,7 @@ class _UserSheetState extends State<_UserSheet> {
     if (!mounted) return;
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Reporte enviado. Gracias.')),
+      SnackBar(content: Text(t('sheet.reported'))),
     );
   }
 
@@ -280,7 +282,7 @@ class _UserSheetState extends State<_UserSheet> {
                         color: nickColor(p['nickname_color'] as String?),
                       ),
                     ),
-                    Text(isGuest ? 'Invitado' : 'Cuenta registrada',
+                    Text(isGuest ? t('profile.guest') : t('profile.registered'),
                         style: TextStyle(
                             color:
                                 Theme.of(context).colorScheme.onSurfaceVariant)),
@@ -305,7 +307,7 @@ class _UserSheetState extends State<_UserSheet> {
                       widget.onPrivateMessage!(widget.profile);
                     },
                     icon: const Icon(Icons.chat_bubble_outline),
-                    label: const Text('Mensaje privado'),
+                    label: Text(t('sheet.privateMessage')),
                   ),
                 if (widget.roomId != null && widget.onWhisper != null)
                   OutlinedButton.icon(
@@ -314,7 +316,7 @@ class _UserSheetState extends State<_UserSheet> {
                       widget.onWhisper!(widget.profile);
                     },
                     icon: const Icon(Icons.voice_over_off_outlined),
-                    label: const Text('Susurrar'),
+                    label: Text(t('sheet.whisper')),
                   ),
                 OutlinedButton.icon(
                   onPressed: _busy ? null : _toggleFav,
@@ -322,18 +324,18 @@ class _UserSheetState extends State<_UserSheet> {
                     _isFav == true ? Icons.favorite : Icons.favorite_border,
                     color: OneChatColors.favorite,
                   ),
-                  label:
-                      Text(_isFav == true ? 'Es tu favorito' : 'Favorito'),
+                  label: Text(
+                      _isFav == true ? t('sheet.isFavorite') : t('sheet.favorite')),
                 ),
                 OutlinedButton.icon(
                   onPressed: _busy ? null : _block,
                   icon: const Icon(Icons.block),
-                  label: const Text('Bloquear'),
+                  label: Text(t('sheet.block')),
                 ),
                 OutlinedButton.icon(
                   onPressed: _busy ? null : _report,
                   icon: const Icon(Icons.flag_outlined),
-                  label: const Text('Reportar'),
+                  label: Text(t('sheet.report')),
                 ),
               ],
             ),
@@ -346,21 +348,21 @@ class _UserSheetState extends State<_UserSheet> {
                       size: 18,
                       color: Theme.of(context).colorScheme.primary),
                   const SizedBox(width: 6),
-                  const Text('Moderación de la sala',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  Text(t('mod.panelTitle'),
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
                 ],
               ),
               if (_banned)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.only(top: 6),
-                  child: Text('Este usuario está baneado de la sala.',
-                      style: TextStyle(color: Colors.redAccent)),
+                  child: Text(t('sheet.bannedState'),
+                      style: const TextStyle(color: Colors.redAccent)),
                 )
               else if (_mutedActive)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.only(top: 6),
-                  child: Text('Este usuario está silenciado ahora.',
-                      style: TextStyle(color: Colors.orangeAccent)),
+                  child: Text(t('sheet.mutedState'),
+                      style: const TextStyle(color: Colors.orangeAccent)),
                 ),
               const SizedBox(height: 10),
               Wrap(
@@ -371,68 +373,68 @@ class _UserSheetState extends State<_UserSheet> {
                     OutlinedButton.icon(
                       onPressed: _busy ? null : () => _moderate('unban'),
                       icon: const Icon(Icons.lock_open_outlined, size: 18),
-                      label: const Text('Quitar baneo'),
+                      label: Text(t('sheet.unban')),
                     )
                   else ...[
                     OutlinedButton.icon(
                       onPressed: _busy
                           ? null
                           : () => _moderate('ban',
-                              confirm:
-                                  '¿Banear a ${widget.profile['nickname']} de esta sala? No podrá entrar ni escribir.'),
+                              confirm: t('sheet.banConfirm',
+                                  {'nick': '${widget.profile['nickname']}'})),
                       icon: const Icon(Icons.gavel, size: 18),
-                      label: const Text('Banear'),
+                      label: Text(t('sheet.ban')),
                     ),
                     if (_mutedActive)
                       OutlinedButton.icon(
                         onPressed: _busy ? null : () => _moderate('unmute'),
                         icon: const Icon(Icons.volume_up_outlined, size: 18),
-                        label: const Text('Quitar silencio'),
+                        label: Text(t('sheet.unmute')),
                       )
                     else
                       OutlinedButton.icon(
                         onPressed: _busy ? null : _muteDialog,
                         icon: const Icon(Icons.volume_off_outlined, size: 18),
-                        label: const Text('Silenciar'),
+                        label: Text(t('sheet.mute')),
                       ),
                     OutlinedButton.icon(
                       onPressed: _busy
                           ? null
                           : () => _moderate('kick',
-                              confirm:
-                                  '¿Expulsar a ${widget.profile['nickname']} de la sala? Podrá volver a entrar.'),
+                              confirm: t('sheet.kickConfirm',
+                                  {'nick': '${widget.profile['nickname']}'})),
                       icon: const Icon(Icons.exit_to_app, size: 18),
-                      label: const Text('Expulsar'),
+                      label: Text(t('sheet.kick')),
                     ),
                   ],
                   if (_featuredActive)
                     OutlinedButton.icon(
                       onPressed: _busy ? null : () => _moderate('unfeature'),
                       icon: const Icon(Icons.star_outline, size: 18),
-                      label: const Text('Quitar destacado'),
+                      label: Text(t('sheet.unfeature')),
                     )
                   else
                     OutlinedButton.icon(
                       onPressed: _busy ? null : () => _moderate('feature'),
                       icon: const Icon(Icons.star_border, size: 18),
-                      label: const Text('Destacar'),
+                      label: Text(t('sheet.feature')),
                     ),
                   if (widget.canManageRoles && !_banned)
                     if (_member?['role'] == 'moderator')
                       OutlinedButton.icon(
                         onPressed: _busy
                             ? null
-                            : () => _setRole('member', 'miembro'),
+                            : () => _setRole('member', t('sheet.roleMember')),
                         icon: const Icon(Icons.shield_outlined, size: 18),
-                        label: const Text('Quitar moderador'),
+                        label: Text(t('sheet.removeMod')),
                       )
                     else
                       OutlinedButton.icon(
                         onPressed: _busy
                             ? null
-                            : () => _setRole('moderator', 'moderador'),
+                            : () => _setRole('moderator', t('sheet.roleModerator')),
                         icon: const Icon(Icons.shield, size: 18),
-                        label: const Text('Hacer moderador'),
+                        label: Text(t('sheet.makeMod')),
                       ),
                 ],
               ),

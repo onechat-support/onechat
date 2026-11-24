@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'home_page.dart';
 import 'services.dart';
+import 'strings.dart';
 import 'theme.dart';
 
 String _clean(Object e) => e.toString().replaceFirst('Exception: ', '');
@@ -52,8 +53,7 @@ class _SignUpPageState extends State<SignUpPage> {
       if (profile == null) {
         setState(() {
           _busy = false;
-          _info =
-              'Cuenta creada. Te enviamos un correo de confirmación: ábrelo y toca el enlace (vuelves a la app). Luego inicia sesión y tu nickname «$nick» se reservará automáticamente a tu nombre. Si el correo no era el tuyo, no confirmes nada: ese nickname seguirá libre.';
+          _info = t('auth.accountCreated', {'nick': nick});
         });
       } else {
         Navigator.of(context).pushAndRemoveUntil(
@@ -73,7 +73,7 @@ class _SignUpPageState extends State<SignUpPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Crear cuenta')),
+      appBar: AppBar(title: Text(t('auth.createTitle'))),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -85,18 +85,18 @@ class _SignUpPageState extends State<SignUpPage> {
                 children: [
                   TextField(
                     controller: _nick,
-                    decoration: const InputDecoration(
-                      labelText: 'Nickname (único, queda reservado)',
-                      prefixIcon: Icon(Icons.alternate_email),
+                    decoration: InputDecoration(
+                      labelText: t('auth.nicknameReserved'),
+                      prefixIcon: const Icon(Icons.alternate_email),
                     ),
                   ),
                   const SizedBox(height: 14),
                   TextField(
                     controller: _email,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      labelText: 'Correo',
-                      prefixIcon: Icon(Icons.mail_outline),
+                    decoration: InputDecoration(
+                      labelText: t('auth.email'),
+                      prefixIcon: const Icon(Icons.mail_outline),
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -105,15 +105,15 @@ class _SignUpPageState extends State<SignUpPage> {
                     obscureText: true,
                     autocorrect: false,
                     enableSuggestions: false,
-                    decoration: const InputDecoration(
-                      labelText: 'Contraseña',
-                      prefixIcon: Icon(Icons.lock_outline),
+                    decoration: InputDecoration(
+                      labelText: t('auth.password'),
+                      prefixIcon: const Icon(Icons.lock_outline),
                     ),
                   ),
                   const SizedBox(height: 20),
                   FilledButton(
                     onPressed: _busy ? null : _submit,
-                    child: Text(_busy ? 'Creando…' : 'CREAR CUENTA'),
+                    child: Text(_busy ? t('auth.creating') : t('auth.create')),
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 14),
@@ -169,11 +169,11 @@ class _UpdatePasswordPageState extends State<UpdatePasswordPage> {
   Future<void> _submit() async {
     final p1 = _pass.text;
     if (p1.length < 8) {
-      setState(() => _error = 'Usa al menos 8 caracteres.');
+      setState(() => _error = t('auth.passwordMin'));
       return;
     }
     if (p1 != _pass2.text) {
-      setState(() => _error = 'Las dos contraseñas no coinciden.');
+      setState(() => _error = t('auth.passwordMismatch'));
       return;
     }
     setState(() {
@@ -201,7 +201,7 @@ class _UpdatePasswordPageState extends State<UpdatePasswordPage> {
   Widget build(BuildContext context) {
     final hasSession = _svc.isSignedIn;
     return Scaffold(
-      appBar: AppBar(title: const Text('Nueva contraseña')),
+      appBar: AppBar(title: Text(t('auth.newPasswordTitle'))),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -215,28 +215,28 @@ class _UpdatePasswordPageState extends State<UpdatePasswordPage> {
                     const Icon(Icons.check_circle_outline,
                         size: 56, color: OneChatColors.primary),
                     const SizedBox(height: 16),
-                    const Text(
-                      'Contraseña actualizada. Ahora entra con tu nickname y tu clave nueva.',
+                    Text(
+                      t('auth.passwordUpdated'),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 20),
                     FilledButton(
                       onPressed: widget.onDone,
-                      child: const Text('IR A LA PANTALLA DE ACCESO'),
+                      child: Text(t('auth.goToAccess')),
                     ),
                   ] else if (!hasSession) ...[
-                    const Text(
-                      'Este enlace ya se usó o venció. Pide uno nuevo: en la pantalla de acceso escribe tu nickname, toca «CHATEAR DIRECTAMENTE» y luego «¿Olvidaste tu contraseña?».',
+                    Text(
+                      t('auth.linkExpired'),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 20),
                     FilledButton(
                       onPressed: widget.onDone,
-                      child: const Text('IR A LA PANTALLA DE ACCESO'),
+                      child: Text(t('auth.goToAccess')),
                     ),
                   ] else ...[
-                    const Text(
-                      'Escribe tu contraseña nueva. La vas a usar junto con tu nickname para entrar.',
+                    Text(
+                      t('auth.newPasswordBody'),
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 20),
@@ -245,9 +245,9 @@ class _UpdatePasswordPageState extends State<UpdatePasswordPage> {
                       obscureText: true,
                       autocorrect: false,
                       enableSuggestions: false,
-                      decoration: const InputDecoration(
-                        labelText: 'Contraseña nueva',
-                        prefixIcon: Icon(Icons.lock_outline),
+                      decoration: InputDecoration(
+                        labelText: t('auth.newPassword'),
+                        prefixIcon: const Icon(Icons.lock_outline),
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -256,15 +256,15 @@ class _UpdatePasswordPageState extends State<UpdatePasswordPage> {
                       obscureText: true,
                       autocorrect: false,
                       enableSuggestions: false,
-                      decoration: const InputDecoration(
-                        labelText: 'Repite la contraseña nueva',
-                        prefixIcon: Icon(Icons.lock_reset),
+                      decoration: InputDecoration(
+                        labelText: t('auth.repeatPassword'),
+                        prefixIcon: const Icon(Icons.lock_reset),
                       ),
                     ),
                     const SizedBox(height: 20),
                     FilledButton(
                       onPressed: _busy ? null : _submit,
-                      child: Text(_busy ? 'Guardando…' : 'GUARDAR CONTRASEÑA'),
+                      child: Text(_busy ? t('auth.saving') : t('auth.savePassword')),
                     ),
                     if (_error != null) ...[
                       const SizedBox(height: 14),
@@ -341,7 +341,7 @@ class _NicknameSetupPageState extends State<NicknameSetupPage> {
         _busy = false;
         _error = e is Exception &&
                 e.toString().contains('23505')
-            ? 'Ese nickname ya está en uso. Prueba con otro.'
+            ? t('auth.nicknameTaken')
             : _clean(e);
       });
     }
@@ -350,7 +350,7 @@ class _NicknameSetupPageState extends State<NicknameSetupPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Elige tu nickname')),
+      appBar: AppBar(title: Text(t('auth.chooseNickname'))),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -360,22 +360,22 @@ class _NicknameSetupPageState extends State<NicknameSetupPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    'Tu cuenta ya entró. Falta tu nickname: será único y quedará reservado para ti.',
+                  Text(
+                    t('auth.nicknameIntro'),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 20),
                   TextField(
                     controller: _nick,
-                    decoration: const InputDecoration(
-                      labelText: 'Tu nickname',
-                      prefixIcon: Icon(Icons.alternate_email),
+                    decoration: InputDecoration(
+                      labelText: t('auth.nickname'),
+                      prefixIcon: const Icon(Icons.alternate_email),
                     ),
                   ),
                   const SizedBox(height: 20),
                   FilledButton(
                     onPressed: _busy ? null : _submit,
-                    child: Text(_busy ? 'Guardando…' : 'CONTINUAR'),
+                    child: Text(_busy ? t('auth.saving') : t('auth.continue')),
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 14),

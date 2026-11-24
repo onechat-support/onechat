@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'auth_pages.dart';
 import 'home_page.dart';
 import 'services.dart';
+import 'strings.dart';
 import 'theme.dart';
 
 /// Pantalla de acceso unificada (pedido de Mario, 2026-11-23):
@@ -57,7 +58,7 @@ class _WelcomePageState extends State<WelcomePage> {
         setState(() {
           _busy = false;
           _needsPassword = true;
-          _info = 'Este nickname tiene una cuenta. Escribe tu contraseña.';
+          _info = t('welcome.registeredNotice');
         });
         return;
       }
@@ -66,7 +67,7 @@ class _WelcomePageState extends State<WelcomePage> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = 'No se pudo comprobar el nickname. Inténtalo de nuevo.';
+        _error = t('welcome.checkFailed');
       });
     }
   }
@@ -89,7 +90,7 @@ class _WelcomePageState extends State<WelcomePage> {
 
   Future<void> _loginRegistered() async {
     if (_passwordController.text.isEmpty) {
-      setState(() => _error = 'Escribe tu contraseña.');
+      setState(() => _error = t('welcome.typePassword'));
       return;
     }
     setState(() {
@@ -128,21 +129,21 @@ class _WelcomePageState extends State<WelcomePage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(isReset
-            ? 'Restablecer contraseña'
-            : 'Reenviar confirmación'),
+            ? t('welcome.resetTitle')
+            : t('welcome.resend')),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(isReset
-                ? 'Te enviaremos un enlace al correo de tu cuenta para crear una contraseña nueva.'
-                : 'Te reenviaremos el correo de confirmación de tu cuenta.'),
+                ? t('welcome.resetBody')
+                : t('welcome.resendBody')),
             const SizedBox(height: 14),
             TextField(
               controller: emailController,
               keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'Correo de tu cuenta',
-                prefixIcon: Icon(Icons.mail_outline),
+              decoration: InputDecoration(
+                labelText: t('welcome.accountEmail'),
+                prefixIcon: const Icon(Icons.mail_outline),
               ),
             ),
           ],
@@ -150,12 +151,12 @@ class _WelcomePageState extends State<WelcomePage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancelar'),
+            child: Text(t('welcome.cancel')),
           ),
           FilledButton(
             onPressed: () =>
                 Navigator.of(ctx).pop(emailController.text.trim()),
-            child: const Text('Enviar'),
+            child: Text(t('welcome.send')),
           ),
         ],
       ),
@@ -176,14 +177,14 @@ class _WelcomePageState extends State<WelcomePage> {
       setState(() {
         _busy = false;
         _info = isReset
-            ? 'Enlace enviado a $email. Revisa tu bandeja y la carpeta de spam.'
-            : 'Confirmación reenviada a $email. Revisa tu bandeja y la carpeta de spam.';
+            ? t('welcome.resetSent', {'email': email})
+            : t('welcome.resendSent', {'email': email});
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = e is Exception ? friendlyAuthError(e) : 'Algo salió mal.';
+        _error = e is Exception ? friendlyAuthError(e) : t('welcome.genericError');
       });
     }
   }
@@ -201,6 +202,27 @@ class _WelcomePageState extends State<WelcomePage> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      for (final lang in ['es', 'en'])
+                        TextButton(
+                          onPressed: () =>
+                              setState(() => appLanguage.value = lang),
+                          child: Text(
+                            lang.toUpperCase(),
+                            style: TextStyle(
+                              fontWeight: appLanguage.value == lang
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                              color: appLanguage.value == lang
+                                  ? OneChatColors.primary
+                                  : null,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                   const Text(
                     'ONEchat',
                     textAlign: TextAlign.center,
@@ -213,7 +235,7 @@ class _WelcomePageState extends State<WelcomePage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Salas para conversar, como las de antes.\nEntra, elige tu nickname y a chatear.',
+                    t('welcome.tagline'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 15,
@@ -237,10 +259,10 @@ class _WelcomePageState extends State<WelcomePage> {
                         });
                       }
                     },
-                    decoration: const InputDecoration(
-                      labelText: 'Tu nickname',
-                      hintText: 'Ej.: Mario',
-                      prefixIcon: Icon(Icons.alternate_email),
+                    decoration: InputDecoration(
+                      labelText: t('welcome.nickname'),
+                      hintText: t('welcome.nicknameHint'),
+                      prefixIcon: const Icon(Icons.alternate_email),
                     ),
                   ),
                   if (_needsPassword) ...[
@@ -252,9 +274,9 @@ class _WelcomePageState extends State<WelcomePage> {
                       enableSuggestions: false,
                       textInputAction: TextInputAction.go,
                       onSubmitted: (_) => _busy ? null : _continue(),
-                      decoration: const InputDecoration(
-                        labelText: 'Contraseña de tu cuenta',
-                        prefixIcon: Icon(Icons.lock_outline),
+                      decoration: InputDecoration(
+                        labelText: t('welcome.password'),
+                        prefixIcon: const Icon(Icons.lock_outline),
                       ),
                     ),
                   ],
@@ -268,8 +290,8 @@ class _WelcomePageState extends State<WelcomePage> {
                             child: CircularProgressIndicator(strokeWidth: 2.5),
                           )
                         : Text(_needsPassword
-                            ? 'ENTRAR CON MI CUENTA'
-                            : 'CHATEAR DIRECTAMENTE'),
+                            ? t('welcome.enterAccount')
+                            : t('welcome.enterChat')),
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 16),
@@ -297,13 +319,13 @@ class _WelcomePageState extends State<WelcomePage> {
                           onPressed: _busy
                               ? null
                               : () => _recoveryDialog(isReset: true),
-                          child: const Text('¿Olvidaste tu contraseña?'),
+                          child: Text(t('welcome.forgot')),
                         ),
                         TextButton(
                           onPressed: _busy
                               ? null
                               : () => _recoveryDialog(isReset: false),
-                          child: const Text('Reenviar confirmación'),
+                          child: Text(t('welcome.resend')),
                         ),
                       ],
                     ),
@@ -317,7 +339,7 @@ class _WelcomePageState extends State<WelcomePage> {
                                 MaterialPageRoute(
                                     builder: (_) => const SignUpPage()),
                               ),
-                      child: const Text('Crear cuenta'),
+                      child: Text(t('welcome.createAccount')),
                     ),
                   ),
                 ],

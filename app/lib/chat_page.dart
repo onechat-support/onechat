@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'dm_pages.dart';
 import 'services.dart';
+import 'strings.dart';
 import 'theme.dart';
 import 'user_sheet.dart';
 
@@ -261,7 +262,7 @@ class _ChatPageState extends State<ChatPage> {
       if (!mounted) return;
       setState(() => _messages.remove(temp));
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo susurrar: $e')),
+        SnackBar(content: Text(t('chat.whisperFailed', {'e': '$e'}))),
       );
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -310,10 +311,55 @@ class _ChatPageState extends State<ChatPage> {
       if (!mounted) return;
       setState(() => _messages.remove(temp));
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo enviar: $e')),
+        SnackBar(content: Text(t('chat.sendFailed', {'e': '$e'}))),
       );
     } finally {
       if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  /// Traducciones pedidas en esta sesión de sala (Etapa 5):
+  /// clave `m<id>` mensajes, `w<id>` susurros.
+  final Map<String, String> _translations = {};
+
+  /// Mantener presionado un mensaje: traducirlo al idioma del
+  /// perfil (o volver al original si ya estaba traducido).
+  Future<void> _translateMenu(String key, String body) async {
+    final has = _translations.containsKey(key);
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (_) => SafeArea(
+        child: ListTile(
+          leading: const Icon(Icons.translate),
+          title: Text(has ? t('chat.showOriginal') : t('chat.translate')),
+          onTap: () => Navigator.pop(context, 'go'),
+        ),
+      ),
+    );
+    if (action != 'go' || !mounted) return;
+    if (has) {
+      setState(() => _translations.remove(key));
+      return;
+    }
+    try {
+      final r = await _svc.translateText(body);
+      if (!mounted) return;
+      final detected = r['detected'] as String? ?? '';
+      if (detected == appLanguage.value) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(t('chat.alreadyYourLanguage'))),
+        );
+        return;
+      }
+      final translated = r['translated'] as String? ?? '';
+      if (translated.isEmpty) throw Exception('empty');
+      setState(() => _translations[key] = translated);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(t('chat.translateFailed'))),
+      );
     }
   }
 
@@ -328,6 +374,8 @@ class _ChatPageState extends State<ChatPage> {
     final otherNick = other?['nickname'] as String? ?? '···';
     final senderNick = p?['nickname'] as String? ?? '···';
     return InkWell(
+      onLongPress: () =>
+          _translateMenu('w${m['id']}', m['body'] as String),
       onTap: other == null
           ? null
           : () async {
@@ -342,8 +390,8 @@ class _ChatPageState extends State<ChatPage> {
             children: [
               TextSpan(
                 text: isMe
-                    ? 'Susurras a $otherNick: '
-                    : '$senderNick te susurra: ',
+                    ? t('chat.whisperTo', {'nick': otherNick})
+                    : t('chat.whisperFrom', {'nick': senderNick}),
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontStyle: FontStyle.italic,
@@ -357,6 +405,15 @@ class _ChatPageState extends State<ChatPage> {
                   color: OneChatColors.whisper,
                 ),
               ),
+              if (_translations['w${m['id']}'] != null)
+                TextSpan(
+                  text: '\n🌐 ${_translations['w${m['id']}']}',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                    color: Colors.grey,
+                  ),
+                ),
             ],
           ),
         ),
@@ -370,30 +427,21 @@ class _ChatPageState extends State<ChatPage> {
     if (uid == null) return null;
     final info = _membersInfo[uid];
     if (info == null) return null;
-    if (widget.room['owner_uid'] == uid) return const Text('Dueño de la sala');
+    if (widget.room['owner_uid'] == uid) return Text(t('chat.roleRoomOwner'));
     final role = info['role'] as String?;
-    if (role == 'moderator') return const Text('Moderador');
-    if (role == 'owner') return const Text('Dueño de la sala');
+    if (role == 'moderator') return Text(t('chat.roleModerator'));
+    if (role == 'owner') return Text(t('chat.roleRoomOwner'));
     final feat = info['featured_until'] as String?;
     if (feat != null) {
-      final t = DateTime.tryParse(feat);
-      if (t != null && t.isAfter(DateTime.now())) {
-        return const Text('Destacado');
+      final until = DateTime.tryParse(feat);
+      if (until != null && until.isAfter(DateTime.now())) {
+        return Text(t('chat.featured'));
       }
     }
     return null;
   }
 
-  static const _actionLabels = {
-    'mute': 'silenció a',
-    'unmute': 'quitó el silencio a',
-    'ban': 'baneó a',
-    'unban': 'quitó el baneo a',
-    'kick': 'expulsó a',
-    'feature': 'destacó a',
-    'unfeature': 'quitó el destacado a',
-    'role': 'cambió el rol de',
-  };
+  String _verb(String action) => t('mod.verb.$action');
 
   /// Panel de moderación de la sala: sanciones vigentes (con opción
   /// de levantarlas) y registro de auditoría.
@@ -424,27 +472,27 @@ class _ChatPageState extends State<ChatPage> {
                   controller: scroll,
                   padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
                   children: [
-                    const Text('Moderación de la sala',
+                    Text(t('mod.panelTitle'),
                         style: TextStyle(
                             fontSize: 17, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 16),
-                    const Text('Sanciones vigentes',
+                    Text(t('mod.activeSanctions'),
                         style: TextStyle(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 6),
                     if (sanctioned.isEmpty)
-                      const Text('Ninguna. La sala está tranquila.'),
+                      Text(t('mod.noSanctions')),
                     for (final s in sanctioned)
                       ListTile(
                         contentPadding: EdgeInsets.zero,
                         title: Text(
                             '${(s['member'] as Map?)?['nickname'] ?? '···'}'),
                         subtitle: Text(s['banned_at'] != null
-                            ? 'Baneado de la sala'
-                            : 'Silenciado (sanción vigente)'),
+                            ? t('mod.bannedState')
+                            : t('mod.mutedState')),
                         trailing: TextButton(
                           child: Text(s['banned_at'] != null
-                              ? 'Quitar baneo'
-                              : 'Quitar silencio'),
+                              ? t('mod.liftBan')
+                              : t('mod.liftMute')),
                           onPressed: () async {
                             await _svc.moderateMember(
                               roomId: _roomId,
@@ -457,17 +505,17 @@ class _ChatPageState extends State<ChatPage> {
                         ),
                       ),
                     const SizedBox(height: 16),
-                    const Text('Registro de acciones',
+                    Text(t('mod.logTitle'),
                         style: TextStyle(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 6),
                     if (actions.isEmpty)
-                      const Text('Todavía no hay acciones registradas.'),
+                      Text(t('mod.noLog')),
                     for (final a in actions)
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 3),
                         child: Text(
                           '${(a['actor'] as Map?)?['nickname'] ?? '···'} '
-                          '${_actionLabels[a['action']] ?? a['action']} '
+                          '${_verb(a['action'] as String)} '
                           '${(a['target'] as Map?)?['nickname'] ?? '···'}'
                           '${a['detail'] != null ? ' (${a['detail']})' : ''}',
                           style: const TextStyle(fontSize: 13),
@@ -493,12 +541,12 @@ class _ChatPageState extends State<ChatPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('En la sala (${_occupants.length})',
+            Text(t('chat.occupantsTitle', {'n': '${_occupants.length}'}),
                 style:
                     const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
             if (_occupants.isEmpty)
-              const Text('Solo estás tú por ahora.'),
+              Text(t('chat.onlyYou')),
             for (final o in _occupants)
               ListTile(
                 contentPadding: EdgeInsets.zero,
@@ -540,15 +588,14 @@ class _ChatPageState extends State<ChatPage> {
             children: [
               const Icon(Icons.gavel, size: 44, color: Colors.redAccent),
               const SizedBox(height: 16),
-              const Text(
-                'Estás baneado de esta sala',
+              Text(
+                t('chat.bannedTitle'),
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
-              const Text(
-                'La moderación de la sala te retiró el acceso. '
-                'Puedes seguir usando el resto de ONEchat.',
+              Text(
+                t('chat.bannedBody'),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
@@ -560,7 +607,7 @@ class _ChatPageState extends State<ChatPage> {
                     Navigator.of(context).pop();
                   }
                 },
-                child: const Text('Volver a las salas'),
+                child: Text(t('chat.backToRooms')),
               ),
             ],
           ),
@@ -576,8 +623,8 @@ class _ChatPageState extends State<ChatPage> {
             Text(widget.room['name'] as String),
             Text(
               _occupants.isEmpty
-                  ? 'Sala pública'
-                  : '${_occupants.length} en línea',
+                  ? t('chat.publicRoom')
+                  : t('chat.online', {'n': '${_occupants.length}'}),
               style: const TextStyle(fontSize: 12),
             ),
           ],
@@ -586,12 +633,12 @@ class _ChatPageState extends State<ChatPage> {
           if (_canModerate)
             IconButton(
               icon: const Icon(Icons.shield_outlined),
-              tooltip: 'Moderación de la sala',
+              tooltip: t('chat.modTooltip'),
               onPressed: _showModerationPanel,
             ),
           IconButton(
             icon: const Icon(Icons.people_outline),
-            tooltip: 'Quién está en la sala',
+            tooltip: t('chat.occupantsTooltip'),
             onPressed: _showOccupants,
           ),
         ],
@@ -610,8 +657,8 @@ class _ChatPageState extends State<ChatPage> {
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : _messages.isEmpty
-                    ? const Center(
-                        child: Text('Sé la primera persona en saludar.'))
+                    ? Center(
+                        child: Text(t('chat.empty')))
                     : ListView.builder(
                         controller: _scroll,
                         padding: const EdgeInsets.symmetric(
@@ -644,6 +691,8 @@ class _ChatPageState extends State<ChatPage> {
                                     onPrivateMessage: _startDm,
                                     canModerate: _canModerate,
                                     canManageRoles: _canManageRoles),
+                            onLongPress: () => _translateMenu(
+                                'm${m['id']}', m['body'] as String),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(vertical: 4),
                               child: RichText(
@@ -670,10 +719,19 @@ class _ChatPageState extends State<ChatPage> {
                                       ),
                                     ),
                                     if (isMe)
-                                      const TextSpan(
-                                        text: '  (tú)',
+                                      TextSpan(
+                                        text: t('chat.youSuffix'),
                                         style: TextStyle(
                                             fontSize: 11,
+                                            color: Colors.grey),
+                                      ),
+                                    if (_translations['m${m['id']}'] != null)
+                                      TextSpan(
+                                        text:
+                                            '\n🌐 ${_translations['m${m['id']}']}',
+                                        style: const TextStyle(
+                                            fontSize: 13,
+                                            fontStyle: FontStyle.italic,
                                             color: Colors.grey),
                                       ),
                                   ],
@@ -696,7 +754,7 @@ class _ChatPageState extends State<ChatPage> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Susurrando a ${_whisperTo!['nickname']} — solo esa persona lo ve',
+                      t('chat.whisperingTo', {'nick': '${_whisperTo!['nickname']}'}),
                       style: const TextStyle(
                           color: OneChatColors.whisper,
                           fontStyle: FontStyle.italic),
@@ -704,7 +762,7 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.close, size: 18),
-                    tooltip: 'Cancelar susurro',
+                    tooltip: t('chat.cancelWhisper'),
                     onPressed: () => setState(() => _whisperTo = null),
                   ),
                 ],
@@ -722,10 +780,10 @@ class _ChatPageState extends State<ChatPage> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Estás silenciado en esta sala hasta las '
-                      '${mutedUntil.toLocal().hour.toString().padLeft(2, '0')}:'
-                      '${mutedUntil.toLocal().minute.toString().padLeft(2, '0')}. '
-                      'Puedes leer, pero no escribir.',
+                      t('chat.mutedBanner', {
+                        'time':
+                            '${mutedUntil.toLocal().hour.toString().padLeft(2, '0')}:${mutedUntil.toLocal().minute.toString().padLeft(2, '0')}'
+                      }),
                       style: const TextStyle(color: Colors.orangeAccent),
                     ),
                   ),
@@ -746,10 +804,10 @@ class _ChatPageState extends State<ChatPage> {
                       onSubmitted: (_) => _send(),
                       decoration: InputDecoration(
                         hintText: mutedUntil != null
-                            ? 'Estás silenciado…'
+                            ? t('chat.mutedHint')
                             : _whisperTo != null
-                                ? 'Escribe un susurro…'
-                                : 'Escribe un mensaje… (@nickname menciona)',
+                                ? t('chat.hintWhisper')
+                                : t('chat.hintMessage'),
                       ),
                     ),
                   ),
@@ -757,7 +815,7 @@ class _ChatPageState extends State<ChatPage> {
                   IconButton.filled(
                     onPressed: _sending || mutedUntil != null ? null : _send,
                     icon: const Icon(Icons.send),
-                    tooltip: 'Enviar',
+                    tooltip: t('chat.sendTooltip'),
                   ),
                 ],
               ),

@@ -4,6 +4,7 @@ import 'chat_page.dart';
 import 'dm_pages.dart';
 import 'main.dart';
 import 'services.dart';
+import 'strings.dart';
 import 'theme.dart';
 import 'user_sheet.dart';
 
@@ -33,6 +34,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     applyProfileTheme(widget.profile);
+    applyProfileLanguage(widget.profile);
     _svc.touchLastSeen();
     _refreshUnread();
     _loadGeneral();
@@ -60,11 +62,11 @@ class _HomePageState extends State<HomePage> {
             ? Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('No se pudo abrir la Sala General.'),
+                  Text(t('general.loadFailed')),
                   const SizedBox(height: 12),
                   FilledButton(
                     onPressed: () => setState(() => _tab = 1),
-                    child: const Text('Ir a las salas'),
+                    child: Text(t('general.goToRooms')),
                   ),
                 ],
               )
@@ -108,6 +110,7 @@ class _HomePageState extends State<HomePage> {
         onProfileChanged: (p) {
           setState(() => _profile = p);
           applyProfileTheme(p);
+          applyProfileLanguage(p);
         },
       ),
     ];
@@ -145,14 +148,14 @@ class _HomePageState extends State<HomePage> {
           if (i == 3) _statusKey.currentState?.reload();
         },
         destinations: [
-          const NavigationDestination(
-              icon: Icon(Icons.forum_outlined),
-              selectedIcon: Icon(Icons.forum),
-              label: 'General'),
-          const NavigationDestination(
-              icon: Icon(Icons.explore_outlined),
-              selectedIcon: Icon(Icons.explore),
-              label: 'Salas'),
+          NavigationDestination(
+              icon: const Icon(Icons.forum_outlined),
+              selectedIcon: const Icon(Icons.forum),
+              label: t('tabs.general')),
+          NavigationDestination(
+              icon: const Icon(Icons.explore_outlined),
+              selectedIcon: const Icon(Icons.explore),
+              label: t('tabs.rooms')),
           NavigationDestination(
             icon: Badge(
               isLabelVisible: _dmUnread > 0,
@@ -160,7 +163,7 @@ class _HomePageState extends State<HomePage> {
               child: const Icon(Icons.chat_bubble_outline),
             ),
             selectedIcon: const Icon(Icons.chat_bubble),
-            label: 'Privados',
+            label: t('tabs.private'),
           ),
           NavigationDestination(
             icon: Badge(
@@ -169,12 +172,12 @@ class _HomePageState extends State<HomePage> {
               child: const Icon(Icons.notifications_outlined),
             ),
             selectedIcon: const Icon(Icons.notifications),
-            label: 'Status',
+            label: t('tabs.status'),
           ),
-          const NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              selectedIcon: Icon(Icons.person),
-              label: 'Perfil'),
+          NavigationDestination(
+              icon: const Icon(Icons.person_outline),
+              selectedIcon: const Icon(Icons.person),
+              label: t('tabs.profile')),
         ],
       ),
     );
@@ -202,17 +205,18 @@ class _RoomsTabState extends State<_RoomsTab> {
           return const Center(child: CircularProgressIndicator());
         }
         if (snap.hasError) {
-          return Center(child: Text('Error al cargar salas: ${snap.error}'));
+          return Center(
+              child: Text(t('rooms.error', {'error': '${snap.error}'})));
         }
         final rooms = snap.data ?? [];
         // Lista plana con encabezados de sección: Plataforma,
         // Latino, Norteamérica, Europa, Temáticos.
-        const headers = {
-          'plataforma': 'Plataforma',
-          'latino': 'Latino',
-          'norteamerica': 'Norteamérica',
-          'europa': 'Europa',
-          'tematicos': 'Temáticos',
+        final headers = {
+          'plataforma': t('rooms.platform'),
+          'latino': t('rooms.latino'),
+          'norteamerica': t('rooms.northAmerica'),
+          'europa': t('rooms.europe'),
+          'tematicos': t('rooms.thematic'),
         };
         final items = <Object>[];
         for (final c in headers.keys) {
@@ -260,10 +264,10 @@ class _RoomsTabState extends State<_RoomsTab> {
                   title: Text(r['name'] as String,
                       style: const TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: Text(isPlatform
-                      ? 'Atendida por el Staff'
+                      ? t('rooms.staffAttended')
                       : isRegional
-                          ? 'Sala regional'
-                          : 'Sala temática'),
+                          ? t('rooms.regional')
+                          : t('rooms.thematicRoom')),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
@@ -309,19 +313,19 @@ class _StatusTabState extends State<_StatusTab> {
   String _label(Map<String, dynamic> n) {
     switch (n['kind']) {
       case 'mention':
-        return 'Te mencionaron en una sala';
+        return t('status.mention');
       case 'whisper':
-        return 'Recibiste un susurro';
+        return t('status.whisper');
       case 'dm':
-        return 'Nuevo mensaje privado';
+        return t('status.dm');
       case 'favorite_in':
-        return 'Alguien te agregó a favoritos';
+        return t('status.favorite');
       case 'favorite_out':
-        return 'Uno de tus favoritos entró';
+        return t('status.favoriteIn');
       case 'moderation':
-        return 'Aviso de moderación';
+        return t('status.moderation');
       default:
-        return 'Aviso del sistema';
+        return t('status.system');
     }
   }
 
@@ -335,11 +339,11 @@ class _StatusTabState extends State<_StatusTab> {
         }
         final items = snap.data ?? [];
         if (items.isEmpty) {
-          return const Center(
+          return Center(
             child: Padding(
-              padding: EdgeInsets.all(28),
+              padding: const EdgeInsets.all(28),
               child: Text(
-                'Tu Sala Status está tranquila.\nAquí llegarán menciones, susurros, privados y avisos.',
+                t('status.empty'),
                 textAlign: TextAlign.center,
               ),
             ),
@@ -399,6 +403,21 @@ class _ProfileTabState extends State<_ProfileTab> {
     'Estados Unidos', 'Canadá', 'España', 'Otro',
   ];
 
+  String _countryLabel(String c) => switch (c) {
+        'Estados Unidos' => t('country.US'),
+        'Canadá' => t('country.CA'),
+        'España' => t('country.ES'),
+        'República Dominicana' => t('country.DO'),
+        'Otro' => t('country.other'),
+        _ => c,
+      };
+
+  Future<void> _saveLanguage(String lang) async {
+    await _svc.updateMyProfile(language: lang);
+    final fresh = await _svc.fetchMyProfile();
+    if (fresh != null && mounted) widget.onProfileChanged(fresh);
+  }
+
   Future<void> _saveTheme(String mode) async {
     await _svc.updateMyProfile(themeMode: mode);
     final fresh = await _svc.fetchMyProfile();
@@ -432,7 +451,7 @@ class _ProfileTabState extends State<_ProfileTab> {
     setState(() => _saving = false);
     if (fresh != null) widget.onProfileChanged(fresh);
     ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Perfil guardado.')));
+        .showSnackBar(SnackBar(content: Text(t('profile.saved'))));
   }
 
   Future<void> _showBlocked() async {
@@ -448,16 +467,17 @@ class _ProfileTabState extends State<_ProfileTab> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Usuarios bloqueados',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+            Text(t('profile.blocked'),
+                style:
+                    const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
-            if (profiles.isEmpty) const Text('No has bloqueado a nadie.'),
+            if (profiles.isEmpty) Text(t('profile.noBlocked')),
             for (final p in profiles)
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(p['nickname'] as String),
                 trailing: TextButton(
-                  child: const Text('Desbloquear'),
+                  child: Text(t('profile.unblock')),
                   onPressed: () async {
                     await _svc.unblock(p['uid'] as String);
                     if (mounted) Navigator.pop(context);
@@ -509,20 +529,20 @@ class _ProfileTabState extends State<_ProfileTab> {
                         fontWeight: FontWeight.bold,
                         color: nickColor(p['nickname_color'] as String?))),
                 Text(p['is_guest'] == true
-                    ? 'Invitado'
-                    : 'Cuenta registrada'),
+                    ? t('profile.guest')
+                    : t('profile.registered')),
                 if (p['global_role'] == 'owner')
-                  const Text('Dueño de ONEchat',
+                  Text(t('profile.roleOwner'),
                       style: TextStyle(
                           color: OneChatColors.roomOwner,
                           fontWeight: FontWeight.w600)),
                 if (p['global_role'] == 'staff')
-                  const Text('Staff de ONEchat',
+                  Text(t('profile.roleStaff'),
                       style: TextStyle(
                           color: OneChatColors.staff,
                           fontWeight: FontWeight.w600)),
                 if (p['global_role'] == 'moderator')
-                  const Text('Moderador global',
+                  Text(t('profile.roleMod'),
                       style: TextStyle(
                           color: OneChatColors.moderator,
                           fontWeight: FontWeight.w600)),
@@ -531,8 +551,8 @@ class _ProfileTabState extends State<_ProfileTab> {
           ],
         ),
         const SizedBox(height: 22),
-        const Text('Color de tu nickname',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        Text(t('profile.color'),
+            style: const TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 10),
         Wrap(
           spacing: 10,
@@ -551,50 +571,62 @@ class _ProfileTabState extends State<_ProfileTab> {
           ],
         ),
         const SizedBox(height: 22),
-        const Text('Tema de la app',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        Text(t('profile.theme'),
+            style: const TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 10),
         SegmentedButton<String>(
-          segments: const [
+          segments: [
             ButtonSegment(
                 value: 'system',
-                icon: Icon(Icons.brightness_auto_outlined),
-                label: Text('Sistema')),
+                icon: const Icon(Icons.brightness_auto_outlined),
+                label: Text(t('profile.themeSystem'))),
             ButtonSegment(
                 value: 'dark',
-                icon: Icon(Icons.dark_mode_outlined),
-                label: Text('Oscuro')),
+                icon: const Icon(Icons.dark_mode_outlined),
+                label: Text(t('profile.themeDark'))),
             ButtonSegment(
                 value: 'light',
-                icon: Icon(Icons.light_mode_outlined),
-                label: Text('Claro')),
+                icon: const Icon(Icons.light_mode_outlined),
+                label: Text(t('profile.themeLight'))),
           ],
           selected: {p['theme_mode'] as String? ?? 'system'},
           onSelectionChanged: (s) => _saveTheme(s.first),
+        ),
+        const SizedBox(height: 22),
+        Text(t('profile.language'),
+            style: const TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        SegmentedButton<String>(
+          segments: const [
+            ButtonSegment(value: 'es', label: Text('Español')),
+            ButtonSegment(value: 'en', label: Text('English')),
+          ],
+          selected: {p['language'] as String? ?? 'es'},
+          onSelectionChanged: (s) => _saveLanguage(s.first),
         ),
         const SizedBox(height: 22),
         TextField(
           controller: _bio,
           maxLines: 3,
           maxLength: 160,
-          decoration: const InputDecoration(labelText: 'Tu bio'),
+          decoration: InputDecoration(labelText: t('profile.bio')),
         ),
         const SizedBox(height: 8),
         FilledButton(
           onPressed: _saving ? null : _saveBio,
-          child: Text(_saving ? 'Guardando…' : 'GUARDAR PERFIL'),
+          child: Text(_saving ? t('profile.saving') : t('profile.save')),
         ),
         const SizedBox(height: 22),
-        const Text('Tu país',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        Text(t('profile.country'),
+            style: const TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 10),
         DropdownButtonFormField<String>(
           initialValue:
               _countries.contains(p['country']) ? p['country'] as String : null,
-          decoration: const InputDecoration(labelText: 'País'),
+          decoration: InputDecoration(labelText: t('profile.countryLabel')),
           items: [
             for (final c in _countries)
-              DropdownMenuItem(value: c, child: Text(c)),
+              DropdownMenuItem(value: c, child: Text(_countryLabel(c))),
           ],
           onChanged: _saveCountry,
         ),
@@ -602,13 +634,13 @@ class _ProfileTabState extends State<_ProfileTab> {
         OutlinedButton.icon(
           onPressed: _showBlocked,
           icon: const Icon(Icons.block),
-          label: const Text('Usuarios bloqueados'),
+          label: Text(t('profile.blocked')),
         ),
         const SizedBox(height: 10),
         OutlinedButton.icon(
           onPressed: _signOut,
           icon: const Icon(Icons.logout),
-          label: const Text('Cerrar sesión'),
+          label: Text(t('profile.signOut')),
         ),
       ],
     );

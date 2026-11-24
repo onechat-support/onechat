@@ -7,6 +7,7 @@ import 'auth_pages.dart';
 import 'config.dart';
 import 'home_page.dart';
 import 'services.dart';
+import 'strings.dart';
 import 'theme.dart';
 import 'welcome_page.dart';
 
@@ -38,13 +39,16 @@ class OneChatApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: appThemeMode,
-      builder: (context, mode, _) => MaterialApp(
-        title: 'ONEchat',
-        debugShowCheckedModeBanner: false,
-        theme: buildOneChatLightTheme(),
-        darkTheme: buildOneChatDarkTheme(),
-        themeMode: mode, // el del perfil: system | dark | light (§9)
-        home: const SessionGate(),
+      builder: (context, mode, _) => ValueListenableBuilder<String>(
+        valueListenable: appLanguage,
+        builder: (context, lang, _) => MaterialApp(
+          title: 'ONEchat',
+          debugShowCheckedModeBanner: false,
+          theme: buildOneChatLightTheme(),
+          darkTheme: buildOneChatDarkTheme(),
+          themeMode: mode, // el del perfil: system | dark | light (§9)
+          home: const SessionGate(),
+        ),
       ),
     );
   }
