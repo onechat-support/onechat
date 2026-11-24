@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'chat_page.dart';
+import 'config.dart';
 import 'dm_pages.dart';
 import 'main.dart';
 import 'services.dart';
@@ -753,6 +754,19 @@ class _ProfileTabState extends State<_ProfileTab> {
           onPressed: _signOut,
           icon: const Icon(Icons.logout),
           label: Text(t('profile.signOut')),
+        ),
+        const SizedBox(height: 18),
+        Center(
+          child: Text(
+            'ONEchat · v${AppConfig.appVersion}',
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.45),
+            ),
+          ),
         ),
       ],
     );

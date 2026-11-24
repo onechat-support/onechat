@@ -222,7 +222,16 @@ class _DmChatPageState extends State<DmChatPage> {
       if (id is int && _knownIds.contains(id)) return;
       if (!mounted) return;
       setState(() {
-        _messages.add(row);
+        final ti = row['sender_uid'] == _svc.myUid
+            ? _messages.indexWhere((m) =>
+                (m['id'] is int && (m['id'] as int) < 0) &&
+                m['body'] == row['body'])
+            : -1;
+        if (ti >= 0) {
+          _messages[ti] = row;
+        } else {
+          _messages.add(row);
+        }
         if (id is int) _knownIds.add(id);
       });
       _jumpToBottom();

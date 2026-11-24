@@ -154,7 +154,20 @@ class _ChatPageState extends State<ChatPage> {
       if (!mounted) return;
       if (id is int && _knownWhisperIds.contains(id)) return;
       setState(() {
-        _messages.add(_prepareWhisper(row));
+        final prepared = _prepareWhisper(row);
+        // Si el eco es de MI susurro y aún está el temporal, lo
+        // reemplazo en su lugar (sin parpadeo de duplicado).
+        final ti = row['sender_uid'] == _svc.myUid
+            ? _messages.indexWhere((m) =>
+                (m['id'] is int && (m['id'] as int) < 0) &&
+                m['is_whisper'] == true &&
+                m['body'] == row['body'])
+            : -1;
+        if (ti >= 0) {
+          _messages[ti] = prepared;
+        } else {
+          _messages.add(prepared);
+        }
         if (id is int) _knownWhisperIds.add(id);
       });
       _jumpToBottom();
@@ -172,7 +185,18 @@ class _ChatPageState extends State<ChatPage> {
       if (!mounted) return;
       if (id is int && _knownIds.contains(id)) return;
       setState(() {
-        _messages.add(row);
+        // Si el eco es de MI mensaje y aún está el temporal, lo
+        // reemplazo en su lugar (sin parpadeo de duplicado).
+        final ti = row['sender_uid'] == _svc.myUid
+            ? _messages.indexWhere((m) =>
+                (m['id'] is int && (m['id'] as int) < 0) &&
+                m['body'] == row['body'])
+            : -1;
+        if (ti >= 0) {
+          _messages[ti] = row;
+        } else {
+          _messages.add(row);
+        }
         if (id is int) _knownIds.add(id);
       });
       _jumpToBottom();

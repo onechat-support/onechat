@@ -6,6 +6,10 @@
 /// políticas RLS de la base de datos y las funciones de servidor.
 /// La clave secreta (service_role) jamás va en el cliente.
 class AppConfig {
+  /// Sello visible de la versión (Perfil): sirve para confirmar
+  /// qué tan fresca es la copia que el navegador está ejecutando.
+  static const appVersion = '2026.11.24.5';
+
   static const supabaseUrl = 'https://jsdyoqmgdkqlkucebjmt.supabase.co';
   static const supabasePublishableKey =
       'sb_publishable_FE28e094cucvLYdDFlnxKQ_dxlKjXO-';
