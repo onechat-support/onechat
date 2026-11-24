@@ -1,6 +1,6 @@
 {
-    "name": "onechat",
-    "short_name": "onechat",
+    "name": "ONEchat",
+    "short_name": "ONEchat",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
