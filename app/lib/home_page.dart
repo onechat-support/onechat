@@ -5,6 +5,7 @@ import 'chat_page.dart';
 import 'config.dart';
 import 'dm_pages.dart';
 import 'main.dart';
+import 'revoked_page.dart';
 import 'services.dart';
 import 'strings.dart';
 import 'theme.dart';
@@ -46,6 +47,17 @@ class _HomePageState extends State<HomePage> {
     applyProfileTheme(widget.profile);
     applyProfileLanguage(widget.profile);
     _svc.touchLastSeen();
+    // Puerta también aquí: quien entra desde la bienvenida
+    // no pasa por SessionGate en esta misma carga. Registra
+    // la conexión (IP + dispositivo) y, si hay Destierro,
+    // lo manda a la pantalla de acceso revocado.
+    _svc.entryCheck().then((v) {
+      if (!mounted || v['banned'] != true) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => RevokedPage(verdict: v)),
+        (_) => false,
+      );
+    });
     _refreshUnread();
     _loadGeneral();
     // Avisos en vivo: si me escriben o me llega una notificación
