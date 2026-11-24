@@ -23,11 +23,59 @@ class _HomePageState extends State<HomePage> {
   late Map<String, dynamic> _profile = widget.profile;
   final _svc = OnechatService();
 
+  // La Sala General es la puerta de entrada: primera pestaña y
+  // chat abierto al entrar. Su fila se busca por slug al iniciar.
+  Map<String, dynamic>? _generalRoom;
+  bool _generalFailed = false;
+  final _statusKey = GlobalKey<_StatusTabState>();
+
   @override
   void initState() {
     super.initState();
     _svc.touchLastSeen();
     _refreshUnread();
+    _loadGeneral();
+  }
+
+  Future<void> _loadGeneral() async {
+    try {
+      final rooms = await _svc.fetchRooms();
+      final general = rooms.where((r) => r['slug'] == 'general').firstOrNull;
+      if (!mounted) return;
+      setState(() {
+        _generalRoom = general;
+        _generalFailed = general == null;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _generalFailed = true);
+    }
+  }
+
+  Widget _generalTab() {
+    final room = _generalRoom;
+    if (room == null) {
+      return Center(
+        child: _generalFailed
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('No se pudo abrir la Sala General.'),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: () => setState(() => _tab = 1),
+                    child: const Text('Ir a las salas'),
+                  ),
+                ],
+              )
+            : const CircularProgressIndicator(),
+      );
+    }
+    return ChatPage(
+      room: room,
+      myProfile: _profile,
+      embedded: true,
+      onExit: () => setState(() => _tab = 1),
+    );
   }
 
   Future<void> _refreshUnread() async {
@@ -45,46 +93,61 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final pages = [
+      _generalTab(),
       _RoomsTab(myProfile: _profile),
       ConversationsTab(myProfile: _profile),
-      _StatusTab(onSeen: () {
-        if (_unread != 0) setState(() => _unread = 0);
-      }),
+      _StatusTab(
+        key: _statusKey,
+        onSeen: () {
+          if (_unread != 0) setState(() => _unread = 0);
+        },
+      ),
       _ProfileTab(
         profile: _profile,
         onProfileChanged: (p) => setState(() => _profile = p),
       ),
     ];
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('ONEchat',
-            style: TextStyle(
-                color: OneChatColors.primary, fontWeight: FontWeight.w800)),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 14),
-            child: Center(
-              child: Text(
-                _profile['nickname'] as String,
-                style: TextStyle(
-                    color: nickColor(_profile['nickname_color'] as String?),
-                    fontWeight: FontWeight.bold),
-              ),
+      // En la pestaña General manda la barra propia de la sala
+      // (nombre, en línea, moderación); en las demás, la de ONEchat.
+      appBar: _tab == 0
+          ? null
+          : AppBar(
+              title: const Text('ONEchat',
+                  style: TextStyle(
+                      color: OneChatColors.primary,
+                      fontWeight: FontWeight.w800)),
+              actions: [
+                Padding(
+                  padding: const EdgeInsets.only(right: 14),
+                  child: Center(
+                    child: Text(
+                      _profile['nickname'] as String,
+                      style: TextStyle(
+                          color:
+                              nickColor(_profile['nickname_color'] as String?),
+                          fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
-      body: pages[_tab],
+      body: IndexedStack(index: _tab, children: pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
         onDestinationSelected: (i) {
           setState(() => _tab = i);
           _refreshUnread();
+          if (i == 3) _statusKey.currentState?.reload();
         },
         destinations: [
           const NavigationDestination(
               icon: Icon(Icons.forum_outlined),
               selectedIcon: Icon(Icons.forum),
+              label: 'General'),
+          const NavigationDestination(
+              icon: Icon(Icons.explore_outlined),
+              selectedIcon: Icon(Icons.explore),
               label: 'Salas'),
           NavigationDestination(
             icon: Badge(
@@ -215,7 +278,7 @@ class _RoomsTabState extends State<_RoomsTab> {
 }
 
 class _StatusTab extends StatefulWidget {
-  const _StatusTab({required this.onSeen});
+  const _StatusTab({super.key, required this.onSeen});
   final VoidCallback onSeen;
 
   @override
@@ -224,7 +287,13 @@ class _StatusTab extends StatefulWidget {
 
 class _StatusTabState extends State<_StatusTab> {
   final _svc = OnechatService();
-  late final Future<List<Map<String, dynamic>>> _items = _load();
+  late Future<List<Map<String, dynamic>>> _items = _load();
+
+  /// Recarga al volver a la pestaña (la pila de pestañas la mantiene
+  /// viva, así que sin esto la lista quedaría vieja).
+  void reload() {
+    setState(() => _items = _load());
+  }
 
   Future<List<Map<String, dynamic>>> _load() async {
     final rows = await _svc.fetchNotifications();

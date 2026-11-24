@@ -5,7 +5,11 @@ tiene dueño, excepto General y Ayuda, que son de la plataforma y
 las atiende el Staff. Dueño inicial de las demás: Zeeth (Mario),
 que puede nombrar moderadores por sala o ceder la sala a pedido.
 
-- **Plataforma** (sin dueño): General, Ayuda.
+- **Sala General** (categoría propia, sin dueño): es la sala de
+  entrada — al abrir ONEchat se entra directo a su chat (primera
+  pestaña). La atienden moderadores nombrados por el Staff; solo
+  el Staff/administradores tiene poder de dueño sobre ella.
+- **Plataforma** (sin dueño): Ayuda.
 - **Latino** (20, una por país): México, Guatemala, Honduras,
   El Salvador, Nicaragua, Costa Rica, Panamá, Cuba, República
   Dominicana, Puerto Rico, Colombia, Venezuela, Ecuador, Perú,

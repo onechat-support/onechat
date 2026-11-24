@@ -232,6 +232,7 @@ class OnechatService {
   // ---------- Salas y chat ----------
 
   static const _categoryRank = {
+    'general': -1,
     'plataforma': 0,
     'latino': 1,
     'norteamerica': 2,

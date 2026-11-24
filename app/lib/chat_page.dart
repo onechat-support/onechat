@@ -9,9 +9,19 @@ import 'user_sheet.dart';
 /// Sala de chat (MVP): historial + tiempo real + presencia básica.
 /// Los mensajes de usuarios bloqueados no se muestran.
 class ChatPage extends StatefulWidget {
-  const ChatPage({super.key, required this.room, required this.myProfile});
+  const ChatPage(
+      {super.key,
+      required this.room,
+      required this.myProfile,
+      this.embedded = false,
+      this.onExit});
   final Map<String, dynamic> room;
   final Map<String, dynamic> myProfile;
+
+  /// Incrustada como pestaña (la Sala General al entrar): no es una
+  /// ruta, así que «salir» cambia de pestaña en vez de hacer pop.
+  final bool embedded;
+  final VoidCallback? onExit;
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -543,7 +553,13 @@ class _ChatPageState extends State<ChatPage> {
               ),
               const SizedBox(height: 20),
               FilledButton(
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () {
+                  if (widget.onExit != null) {
+                    widget.onExit!();
+                  } else {
+                    Navigator.of(context).pop();
+                  }
+                },
                 child: const Text('Volver a las salas'),
               ),
             ],
