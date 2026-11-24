@@ -63,6 +63,8 @@ class _UserSheetState extends State<_UserSheet> {
   bool _busy = false;
   Map<String, dynamic>? _member;
   Map<String, dynamic>? _lastConn;
+  String _myRole = 'user';
+  List<Map<String, dynamic>> _bans = [];
 
   String get _uid => widget.profile['uid'] as String;
   bool get _isMe => _uid == _svc.myUid;
@@ -84,6 +86,124 @@ class _UserSheetState extends State<_UserSheet> {
       _svc.lastConnection(_uid).then((c) {
         if (mounted) setState(() => _lastConn = c);
       });
+      // Destierro: mi rol manda si la sección existe.
+      _svc.myGlobalRole().then((r) {
+        if (mounted) setState(() => _myRole = r);
+      });
+      _reloadBans();
+    }
+  }
+
+  bool get _canExile =>
+      !_isMe && (_myRole == 'staff' || _myRole == 'owner');
+
+  Future<void> _reloadBans() async {
+    final bans = await _svc.activeBansFor(_uid);
+    if (mounted) setState(() => _bans = bans);
+  }
+
+  String _kindLabel(String kind) => switch (kind) {
+        'account' => t('exile.kindAccount'),
+        'device' => t('exile.kindDevice'),
+        'ip' => t('exile.kindIp'),
+        _ => kind,
+      };
+
+  Future<void> _liftBan(int id) async {
+    setState(() => _busy = true);
+    try {
+      final ok = await _svc.liftPlatformBan(id);
+      if (!mounted) return;
+      if (ok) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(t('exile.lifted'))));
+        await _reloadBans();
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(t('exile.failed'))));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _showExileDialog() async {
+    final reasonCtrl = TextEditingController();
+    int? hours = 168; // 7 días por defecto
+    final isOwner = _myRole == 'owner';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(t('exile.title')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(t('exile.warn'), style: const TextStyle(fontSize: 13)),
+              const SizedBox(height: 14),
+              DropdownButton<int?>(
+                value: hours,
+                isExpanded: true,
+                items: [
+                  DropdownMenuItem(value: 24, child: Text(t('exile.h24'))),
+                  DropdownMenuItem(value: 168, child: Text(t('exile.d7'))),
+                  DropdownMenuItem(value: 720, child: Text(t('exile.d30'))),
+                  DropdownMenuItem(
+                    value: null,
+                    enabled: isOwner,
+                    child: Text(t('exile.permanent')),
+                  ),
+                ],
+                onChanged: (v) => setLocal(() => hours = v),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: reasonCtrl,
+                maxLines: 2,
+                decoration: InputDecoration(
+                  labelText: t('exile.reason'),
+                  hintText: t('exile.reasonHint'),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(t('sheet.cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(t('exile.apply')),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final reason = reasonCtrl.text.trim();
+    if (reason.length < 3) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(t('exile.failed'))));
+      return;
+    }
+    setState(() => _busy = true);
+    try {
+      final layers = await _svc.applyPlatformBan(_uid, hours, reason);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(t('exile.applied', {'n': '$layers'}))));
+      await _reloadBans();
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(t('exile.failed'))));
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -462,6 +582,54 @@ class _UserSheetState extends State<_UserSheet> {
                         label: Text(t('sheet.makeMod')),
                       ),
                 ],
+              ),
+            ],
+            // ===== Destierro global (S1): solo Staff/dueño =====
+            if (_canExile) ...[
+              const SizedBox(height: 20),
+              const Divider(),
+              Row(
+                children: [
+                  const Icon(Icons.gavel, size: 18, color: Colors.redAccent),
+                  const SizedBox(width: 6),
+                  Text(t('exile.title'),
+                      style: const TextStyle(fontWeight: FontWeight.w600)),
+                ],
+              ),
+              if (_bans.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(t('exile.activeTitle'),
+                    style: const TextStyle(
+                        fontSize: 12.5, fontWeight: FontWeight.w600)),
+                for (final b in _bans)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${_kindLabel(b['kind'] as String)} · '
+                            '${b['expires_at'] == null ? t('exile.permanentLabel') : t('exile.until', {'when': _connWhen(b['expires_at'] as String)})}'
+                            ' · ${b['reason']}',
+                            style: const TextStyle(fontSize: 12.5),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _busy
+                              ? null
+                              : () => _liftBan((b['id'] as num).toInt()),
+                          child: Text(t('exile.lift')),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: _busy ? null : _showExileDialog,
+                icon: const Icon(Icons.block, size: 18, color: Colors.redAccent),
+                label: Text(t('exile.button'),
+                    style: const TextStyle(color: Colors.redAccent)),
               ),
             ],
           ],

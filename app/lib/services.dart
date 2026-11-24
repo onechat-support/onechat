@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'device_identity.dart';
 import 'strings.dart';
 
 /// Traduce los errores de autenticación a lenguaje claro para el
@@ -232,16 +233,85 @@ class OnechatService {
         {'last_seen_at': DateTime.now().toUtc().toIso8601String()}).eq('uid', uid);
   }
 
-  /// Registro de conexión (v1.14): la función del servidor
-  /// observa la IP real de la conexión y la guarda en
-  /// connection_log (solo la lee el Staff). Se llama al
-  /// entrar a la app; nunca bloquea ni muestra errores.
-  Future<void> logVisit() async {
+  /// Puerta de entrada (v1.14 + S1): la función del servidor
+  /// registra la conexión (IP observada por el servidor,
+  /// dispositivo declarado por la app) y verifica el
+  /// Destierro. Devuelve el veredicto: {'ok': true} o
+  /// {'banned': true, 'permanent': bool, 'expires_at': ...}.
+  /// Si la red falla, se deja pasar (fail-open): el control
+  /// se repite en cada apertura de la app.
+  Future<Map<String, dynamic>> entryCheck() async {
     try {
-      await _db.functions.invoke('log-visit');
+      final id = await getDeviceIdentity();
+      final res = await _db.functions.invoke('log-visit', body: {
+        'device_id': id.deviceId,
+        'fingerprint': id.fingerprint,
+      });
+      final data = res.data;
+      if (data is Map) return Map<String, dynamic>.from(data);
+    } catch (_) {}
+    return {'ok': true};
+  }
+
+  /// Mi rol global ('user' | 'staff' | 'owner').
+  Future<String> myGlobalRole() async {
+    final uid = myUid;
+    if (uid == null) return 'user';
+    try {
+      final row = await _db
+          .from('profiles')
+          .select('global_role')
+          .eq('uid', uid)
+          .maybeSingle();
+      return (row?['global_role'] as String?) ?? 'user';
     } catch (_) {
-      // Silencioso a propósito: registrar nunca debe
-      // interrumpir el uso de la app.
+      return 'user';
+    }
+  }
+
+  /// Aplicar el Destierro (S1): bloquea cuenta + dispositivo
+  /// + IP del objetivo en una sola llamada del servidor.
+  /// [hours] null = permanente (solo el dueño). Devuelve el
+  /// número de capas bloqueadas; lanza si no hay permiso.
+  Future<int> applyPlatformBan(
+      String targetUid, int? hours, String reason) async {
+    final r = await _db.rpc('apply_platform_ban', params: {
+      'p_target': targetUid,
+      'p_hours': hours,
+      'p_reason': reason,
+    });
+    return (r as num).toInt();
+  }
+
+  /// Levantar una fila del Destierro. True si se levantó.
+  Future<bool> liftPlatformBan(int banId) async {
+    final r = await _db.rpc('lift_platform_ban', params: {'p_ban_id': banId});
+    return r == true;
+  }
+
+  /// Destierros vigentes de un usuario (solo Staff/dueño:
+  /// la RLS devuelve vacío a los demás).
+  Future<List<Map<String, dynamic>>> activeBansFor(String uid) async {
+    try {
+      final rows = await _db
+          .from('platform_bans')
+          .select(
+              'id, kind, reason, expires_at, created_at, applied_by_nickname')
+          .eq('target_uid', uid)
+          .isFilter('lifted_at', null)
+          .order('created_at', ascending: false);
+      final now = DateTime.now().toUtc();
+      return rows
+          .map((e) => Map<String, dynamic>.from(e as Map))
+          .where((b) {
+            final exp = b['expires_at'] as String?;
+            if (exp == null) return true;
+            final t = DateTime.tryParse(exp);
+            return t != null && t.isAfter(now);
+          })
+          .toList();
+    } catch (_) {
+      return [];
     }
   }
 

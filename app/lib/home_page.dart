@@ -46,7 +46,6 @@ class _HomePageState extends State<HomePage> {
     applyProfileTheme(widget.profile);
     applyProfileLanguage(widget.profile);
     _svc.touchLastSeen();
-    _svc.logVisit();
     _refreshUnread();
     _loadGeneral();
     // Avisos en vivo: si me escriben o me llega una notificación

@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'auth_pages.dart';
 import 'config.dart';
 import 'home_page.dart';
+import 'revoked_page.dart';
 import 'services.dart';
 import 'strings.dart';
 import 'theme.dart';
@@ -67,6 +68,9 @@ class SessionGate extends StatefulWidget {
 class _SessionGateState extends State<SessionGate> {
   StreamSubscription<AuthState>? _sub;
   bool _recovery = startInRecovery;
+  // Veredicto de la puerta (registro + Destierro), por uid.
+  String? _entryUid;
+  Future<Map<String, dynamic>>? _entryFuture;
 
   @override
   void initState() {
@@ -106,7 +110,29 @@ class _SessionGateState extends State<SessionGate> {
         }
         final profile = snap.data;
         if (profile == null) return const NicknameSetupPage();
-        return HomePage(profile: profile);
+        // Puerta de entrada: registra la conexión y aplica
+        // el Destierro (cuenta + dispositivo + IP) antes de
+        // mostrar el interior de la app.
+        final uid = profile['uid'] as String;
+        if (_entryUid != uid) {
+          _entryUid = uid;
+          _entryFuture = svc.entryCheck();
+        }
+        return FutureBuilder<Map<String, dynamic>>(
+          future: _entryFuture,
+          builder: (context, es) {
+            if (es.connectionState != ConnectionState.done) {
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
+            final verdict = es.data ?? const {'ok': true};
+            if (verdict['banned'] == true) {
+              return RevokedPage(verdict: verdict);
+            }
+            return HomePage(profile: profile);
+          },
+        );
       },
     );
   }
