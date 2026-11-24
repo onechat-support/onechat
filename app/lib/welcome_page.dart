@@ -343,6 +343,19 @@ class _WelcomePageState extends State<WelcomePage> {
                       child: Text(t('welcome.createAccount')),
                     ),
                   ),
+                  const SizedBox(height: 18),
+                  // Aviso de privacidad del registro de IP
+                  // (v1.14): quien entra sabe que su conexión
+                  // queda registrada, y para qué.
+                  Text(
+                    t('welcome.privacyNote'),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color:
+                          Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
                 ],
               ),
             ),

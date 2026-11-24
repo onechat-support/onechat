@@ -62,6 +62,7 @@ class _UserSheetState extends State<_UserSheet> {
   bool? _isFav;
   bool _busy = false;
   Map<String, dynamic>? _member;
+  Map<String, dynamic>? _lastConn;
 
   String get _uid => widget.profile['uid'] as String;
   bool get _isMe => _uid == _svc.myUid;
@@ -78,7 +79,19 @@ class _UserSheetState extends State<_UserSheet> {
           if (mounted) setState(() => _member = m);
         });
       }
+      // Última IP registrada: la base solo la entrega al
+      // Staff global y al dueño (RLS); a los demás, null.
+      _svc.lastConnection(_uid).then((c) {
+        if (mounted) setState(() => _lastConn = c);
+      });
     }
+  }
+
+  String _connWhen(String iso) {
+    final d = DateTime.tryParse(iso)?.toLocal();
+    if (d == null) return iso;
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${two(d.day)}-${two(d.month)}-${d.year} ${two(d.hour)}:${two(d.minute)}';
   }
 
   // ---------- Moderación (Etapa 3) ----------
@@ -294,6 +307,18 @@ class _UserSheetState extends State<_UserSheet> {
           if ((p['bio'] as String?)?.isNotEmpty == true) ...[
             const SizedBox(height: 14),
             Text(p['bio'] as String),
+          ],
+          if (_lastConn != null) ...[
+            const SizedBox(height: 10),
+            Text(
+              t('sheet.lastConnection', {
+                'ip': _lastConn!['ip'] as String,
+                'when': _connWhen(_lastConn!['created_at'] as String),
+              }),
+              style: TextStyle(
+                  fontSize: 12.5,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
           ],
           if (!_isMe) ...[
             const SizedBox(height: 20),

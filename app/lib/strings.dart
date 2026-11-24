@@ -41,6 +41,8 @@ const _es = {
   'welcome.resetBody':
       'Te enviaremos un enlace al correo de tu cuenta para crear una contraseña nueva.',
   'welcome.resendBody': 'Te reenviaremos el correo de confirmación de tu cuenta.',
+  'welcome.privacyNote':
+      'Por seguridad y moderación, registramos la dirección IP de tu conexión.',
   'welcome.send': 'Enviar',
   'welcome.cancel': 'Cancelar',
   'welcome.resetSent':
@@ -212,6 +214,7 @@ const _es = {
   'mod.verb.unfeature': 'quitó el destacado a',
   'mod.verb.role': 'cambió el rol de',
   // Ficha de usuario
+  'sheet.lastConnection': 'Última conexión: {ip} · {when}',
   'sheet.privateMessage': 'Mensaje privado',
   'sheet.whisper': 'Susurrar',
   'sheet.favorite': 'Favorito',
@@ -293,6 +296,8 @@ const _en = {
   'welcome.resetBody':
       'We will email your account address a link to create a new password.',
   'welcome.resendBody': 'We will resend your account confirmation email.',
+  'welcome.privacyNote':
+      'For security and moderation, we record the IP address of your connection.',
   'welcome.send': 'Send',
   'welcome.cancel': 'Cancel',
   'welcome.resetSent': 'Link sent to {email}. Check your inbox and spam folder.',
@@ -462,6 +467,7 @@ const _en = {
   'mod.verb.feature': 'featured',
   'mod.verb.unfeature': 'unfeatured',
   'mod.verb.role': 'changed the role of',
+  'sheet.lastConnection': 'Last connection: {ip} · {when}',
   'sheet.privateMessage': 'Private message',
   'sheet.whisper': 'Whisper',
   'sheet.favorite': 'Favorite',

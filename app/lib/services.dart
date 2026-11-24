@@ -232,6 +232,37 @@ class OnechatService {
         {'last_seen_at': DateTime.now().toUtc().toIso8601String()}).eq('uid', uid);
   }
 
+  /// Registro de conexión (v1.14): la función del servidor
+  /// observa la IP real de la conexión y la guarda en
+  /// connection_log (solo la lee el Staff). Se llama al
+  /// entrar a la app; nunca bloquea ni muestra errores.
+  Future<void> logVisit() async {
+    try {
+      await _db.functions.invoke('log-visit');
+    } catch (_) {
+      // Silencioso a propósito: registrar nunca debe
+      // interrumpir el uso de la app.
+    }
+  }
+
+  /// Última conexión registrada de un usuario. La RLS de
+  /// connection_log solo deja leer al Staff global y al
+  /// dueño: para cualquier otro, esto devuelve null.
+  Future<Map<String, dynamic>?> lastConnection(String uid) async {
+    try {
+      final rows = await _db
+          .from('connection_log')
+          .select('ip, created_at')
+          .eq('uid', uid)
+          .order('created_at', ascending: false)
+          .limit(1);
+      if (rows.isEmpty) return null;
+      return Map<String, dynamic>.from(rows.first as Map);
+    } catch (_) {
+      return null;
+    }
+  }
+
   // ---------- Salas y chat ----------
 
   static const _categoryRank = {
