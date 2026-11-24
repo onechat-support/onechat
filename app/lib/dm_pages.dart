@@ -458,24 +458,19 @@ class _DmChatPageState extends State<DmChatPage> {
       if (iAmA) {
         header = Text(t('game.waiting'));
         actions = [
-          TextButton(
-            onPressed: _gameBusy ? null : () => _respond(false),
-            child: Text(t('game.cancel')),
-          ),
+          _gameButton(
+              t('game.cancel'), _gameBusy ? null : () => _respond(false)),
         ];
       } else {
         header = Text(t('game.invitedYou', {'nick': otherNick}),
             style: const TextStyle(fontWeight: FontWeight.bold));
         actions = [
-          FilledButton(
-            onPressed: _gameBusy ? null : () => _respond(true),
-            child: Text(t('game.accept')),
-          ),
+          _gameButton(
+              t('game.accept'), _gameBusy ? null : () => _respond(true),
+              primary: true),
           const SizedBox(width: 8),
-          OutlinedButton(
-            onPressed: _gameBusy ? null : () => _respond(false),
-            child: Text(t('game.decline')),
-          ),
+          _gameButton(
+              t('game.decline'), _gameBusy ? null : () => _respond(false)),
         ];
       }
       return _gameCard(header, actions, null);
@@ -489,10 +484,7 @@ class _DmChatPageState extends State<DmChatPage> {
         style: const TextStyle(fontWeight: FontWeight.bold),
       );
       actions = [
-        TextButton(
-          onPressed: _gameBusy ? null : _resign,
-          child: Text(t('game.resign')),
-        ),
+        _gameButton(t('game.resign'), _gameBusy ? null : _resign),
       ];
       return _gameCard(header, actions, board);
     }
@@ -507,20 +499,38 @@ class _DmChatPageState extends State<DmChatPage> {
         style: const TextStyle(
             fontWeight: FontWeight.bold, color: OneChatColors.primary));
     actions = [
-      FilledButton(
-        onPressed: _gameBusy ? null : _invite,
-        child: Text(t('game.rematch')),
-      ),
+      _gameButton(t('game.rematch'), _gameBusy ? null : _invite,
+          primary: true),
       const SizedBox(width: 8),
-      OutlinedButton(
-        onPressed: () => setState(() {
-          _dismissedGames.add(g['id'] as String);
-          _game = null;
-        }),
-        child: Text(t('game.close')),
-      ),
+      _gameButton(t('game.close'), () => setState(() {
+        _dismissedGames.add(g['id'] as String);
+        _game = null;
+      })),
     ];
     return _gameCard(header, actions, board);
+  }
+
+  Widget _gameButton(String label, VoidCallback? onTap,
+      {bool primary = false}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+        decoration: BoxDecoration(
+          color: primary ? OneChatColors.primary : Colors.transparent,
+          border: Border.all(color: OneChatColors.primary),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: primary ? Colors.white : OneChatColors.primary,
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _gameCard(Widget header, List<Widget> actions, List? board) {

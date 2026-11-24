@@ -43,6 +43,17 @@ Segunda ronda de reportes de Mario en vivo:
    refresca). Las tablas ya estaban en la publicación de
    tiempo real; faltaba la suscripción del cliente.
 
+3. **El invitado al Gato veía la tarjeta sin botones**: la
+   invitación llegaba y la tarjeta se dibujaba con su texto,
+   pero los botones de acción del tema (Aceptar/Rechazar y
+   los demás de la tarjeta) no se pintaban en la web — el
+   espacio quedaba, vacío. Reproducido entrando a la app real
+   con una cuenta de prueba como invitado. Arreglo: las
+   acciones de la tarjeta del juego se dibujan con un botón
+   propio de colores explícitos (InkWell + Container, como
+   las celdas del tablero), sin depender de los estilos de
+   botón del tema.
+
 2. **El emisor veía sus mensajes duplicados** (el receptor
    no; pasaba «cada dos mensajes»): carrera entre el eco en
    tiempo real y la respuesta del envío. El mensaje optimista
