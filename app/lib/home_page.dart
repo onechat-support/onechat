@@ -35,6 +35,7 @@ class _HomePageState extends State<HomePage> {
       _profile['global_role'] == 'owner';
   bool _generalFailed = false;
   final _statusKey = GlobalKey<_StatusTabState>();
+  final _convsKey = GlobalKey<ConversationsTabState>();
 
   @override
   void initState() {
@@ -109,9 +110,10 @@ class _HomePageState extends State<HomePage> {
     final pages = [
       _generalTab(),
       _RoomsTab(myProfile: _profile),
-      ConversationsTab(myProfile: _profile),
+      ConversationsTab(key: _convsKey, myProfile: _profile),
       _StatusTab(
         key: _statusKey,
+        myProfile: _profile,
         onSeen: () {
           if (_unread != 0) setState(() => _unread = 0);
         },
@@ -159,6 +161,7 @@ class _HomePageState extends State<HomePage> {
         onDestinationSelected: (i) {
           setState(() => _tab = i);
           _refreshUnread();
+          if (i == 2) _convsKey.currentState?.reload();
           if (i == 3) _statusKey.currentState?.reload();
         },
         destinations: [
@@ -300,8 +303,9 @@ class _RoomsTabState extends State<_RoomsTab> {
 }
 
 class _StatusTab extends StatefulWidget {
-  const _StatusTab({super.key, required this.onSeen});
+  const _StatusTab({super.key, required this.onSeen, required this.myProfile});
   final VoidCallback onSeen;
+  final Map<String, dynamic> myProfile;
 
   @override
   State<_StatusTab> createState() => _StatusTabState();
@@ -324,14 +328,27 @@ class _StatusTabState extends State<_StatusTab> {
     return rows;
   }
 
+  /// Texto detallado del aviso: quién, qué y dónde (con lo que
+  /// trae el payload; los avisos viejos caen en la etiqueta genérica).
   String _label(Map<String, dynamic> n) {
+    final p = (n['payload'] as Map?) ?? const {};
+    final from = p['from_nickname'] as String?;
+    final room = p['room_name'] as String?;
     switch (n['kind']) {
       case 'mention':
-        return t('status.mention');
+        return from != null
+            ? t('status.mentionFrom',
+                {'from': from, 'room': room ?? ''})
+            : t('status.mention');
       case 'whisper':
-        return t('status.whisper');
+        return from != null
+            ? t('status.whisperFrom',
+                {'from': from, 'room': room ?? ''})
+            : t('status.whisper');
       case 'dm':
-        return t('status.dm');
+        return from != null
+            ? t('status.dmFrom', {'from': from})
+            : t('status.dm');
       case 'favorite_in':
         return t('status.favorite');
       case 'favorite_out':
@@ -339,9 +356,65 @@ class _StatusTabState extends State<_StatusTab> {
       case 'moderation':
         return t('status.moderation');
       case 'game_invite':
-        return t('status.gameInvite');
+        return from != null
+            ? t('status.gameInviteFrom', {'from': from})
+            : t('status.gameInvite');
       default:
         return t('status.system');
+    }
+  }
+
+  IconData _icon(String? kind) {
+    switch (kind) {
+      case 'mention':
+        return Icons.alternate_email;
+      case 'dm':
+        return Icons.mail_outline;
+      case 'whisper':
+        return Icons.chat_bubble_outline;
+      case 'game_invite':
+        return Icons.sports_esports;
+      default:
+        return Icons.notifications_none;
+    }
+  }
+
+  /// Al tocar un aviso, ir a la actividad: el privado, la sala
+  /// de la mención o la conversación del juego.
+  Future<void> _open(Map<String, dynamic> n) async {
+    final p = (n['payload'] as Map?) ?? const {};
+    final kind = n['kind'] as String?;
+    if (kind == 'dm' || kind == 'game_invite') {
+      final fromUid = p['from_uid'] as String?;
+      if (fromUid == null) return;
+      final other = await _svc.profileByUid(fromUid);
+      if (other == null || !mounted) return;
+      final conv = await _svc.getOrCreateConversation(fromUid);
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => DmChatPage(
+            conversationId: conv['id'] as String,
+            other: other,
+            myProfile: widget.myProfile,
+          ),
+        ),
+      );
+      reload();
+      return;
+    }
+    if (kind == 'mention' || kind == 'whisper') {
+      final roomId = p['room_id'] as String?;
+      if (roomId == null) return;
+      final room = await _svc.fetchRoomById(roomId);
+      if (room == null || !mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) =>
+              ChatPage(room: room, myProfile: widget.myProfile),
+        ),
+      );
+      reload();
     }
   }
 
@@ -374,9 +447,7 @@ class _StatusTabState extends State<_StatusTab> {
             final unread = n['read_at'] == null;
             return ListTile(
               leading: Icon(
-                n['kind'] == 'mention'
-                    ? Icons.alternate_email
-                    : Icons.notifications_none,
+                _icon(n['kind'] as String?),
                 color: unread ? OneChatColors.mention : null,
               ),
               title: Text(_label(n),
@@ -384,6 +455,8 @@ class _StatusTabState extends State<_StatusTab> {
                       fontWeight:
                           unread ? FontWeight.bold : FontWeight.normal)),
               subtitle: Text('${n['created_at']}'.substring(0, 16)),
+              trailing: const Icon(Icons.chevron_right, size: 18),
+              onTap: () => _open(n),
             );
           },
         );

@@ -314,6 +314,38 @@ class OnechatService {
   Future<void> unsubscribe(RealtimeChannel channel) =>
       _db.removeChannel(channel);
 
+  /// Mi propio nickname (para firmar los avisos que genero).
+  Future<String?> myNickname() async {
+    final p = await profileByUid(myUid!);
+    return p?['nickname'] as String?;
+  }
+
+  Future<String?> roomNameById(String roomId) async {
+    final rows =
+        await _db.from('rooms').select('name').eq('id', roomId).limit(1);
+    return rows.isEmpty ? null : rows.first['name'] as String?;
+  }
+
+  Future<Map<String, dynamic>?> fetchRoomById(String roomId) async {
+    final rows = await _db.from('rooms').select().eq('id', roomId).limit(1);
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  /// Avisos en vivo de privados nuevos (la RLS limita la suscripción
+  /// a las conversaciones donde participo).
+  RealtimeChannel subscribeInbox(void Function(Map<String, dynamic> row) onInsert) {
+    final channel = _db.channel('dm-inbox-$myUid');
+    channel
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'direct_messages',
+          callback: (payload) => onInsert(payload.newRecord),
+        )
+        .subscribe();
+    return channel;
+  }
+
   Future<Map<String, dynamic>?> profileByUid(String uid) async {
     final rows = await _db.from('profiles').select().eq('uid', uid).limit(1);
     return rows.isEmpty ? null : rows.first;
@@ -360,11 +392,19 @@ class OnechatService {
         })
         .select()
         .single();
+    final myNick = await myNickname();
+    final roomName = await roomNameById(roomId);
     for (final uid in mentionUids) {
       await _db.from('notifications').insert({
         'uid': uid,
         'kind': 'mention',
-        'payload': {'room_id': roomId, 'message_id': inserted['id']},
+        'payload': {
+          'room_id': roomId,
+          'message_id': inserted['id'],
+          'from_uid': myUid,
+          'from_nickname': myNick,
+          'room_name': roomName,
+        },
       });
     }
     return inserted;
@@ -463,7 +503,12 @@ class OnechatService {
     await _db.from('notifications').insert({
       'uid': targetUid,
       'kind': 'whisper',
-      'payload': {'room_id': roomId},
+      'payload': {
+        'room_id': roomId,
+        'from_uid': myUid,
+        'from_nickname': await myNickname(),
+        'room_name': await roomNameById(roomId),
+      },
     });
     return inserted;
   }
@@ -612,7 +657,11 @@ class OnechatService {
     await _db.from('notifications').insert({
       'uid': otherUid,
       'kind': 'dm',
-      'payload': {'conversation_id': conversationId},
+      'payload': {
+        'conversation_id': conversationId,
+        'from_uid': myUid,
+        'from_nickname': await myNickname(),
+      },
     });
     return inserted;
   }

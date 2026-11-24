@@ -25,12 +25,33 @@ class ConversationsTab extends StatefulWidget {
   final Map<String, dynamic> myProfile;
 
   @override
-  State<ConversationsTab> createState() => _ConversationsTabState();
+  State<ConversationsTab> createState() => ConversationsTabState();
 }
 
-class _ConversationsTabState extends State<ConversationsTab> {
+class ConversationsTabState extends State<ConversationsTab> {
   final _svc = OnechatService();
   late Future<List<Map<String, dynamic>>> _convs = _svc.fetchConversations();
+  RealtimeChannel? _inbox;
+
+  @override
+  void initState() {
+    super.initState();
+    // Si me escriben con la app abierta, la lista se refresca sola
+    // (antes solo cargaba una vez y los privados nuevos no salían).
+    _inbox = _svc.subscribeInbox((row) {
+      if (row['sender_uid'] != _svc.myUid && mounted) _reload();
+    });
+  }
+
+  @override
+  void dispose() {
+    final ch = _inbox;
+    if (ch != null) _svc.unsubscribe(ch);
+    super.dispose();
+  }
+
+  /// Recarga pedida desde fuera (al volver a la pestaña).
+  void reload() => _reload();
 
   void _reload() => setState(() => _convs = _svc.fetchConversations());
 
