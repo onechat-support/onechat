@@ -223,14 +223,15 @@ class _WelcomePageState extends State<WelcomePage> {
                         ),
                     ],
                   ),
-                  const Text(
-                    'ONEchat',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 44,
-                      fontWeight: FontWeight.w800,
-                      color: OneChatColors.primary,
-                      letterSpacing: 1.2,
+                  // Logo definitivo de la plataforma (Mario,
+                  // 2026-11-24): wordmark blanco sobre el degradado
+                  // oficial, con la píldora de Early Access.
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: Image.asset(
+                      'assets/logo_onechat.jpg',
+                      fit: BoxFit.fitWidth,
+                      semanticLabel: 'ONEchat',
                     ),
                   ),
                   const SizedBox(height: 8),
