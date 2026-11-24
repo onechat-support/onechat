@@ -36,13 +36,16 @@ class OneChatApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'ONEchat',
-      debugShowCheckedModeBanner: false,
-      theme: buildOneChatLightTheme(),
-      darkTheme: buildOneChatDarkTheme(),
-      themeMode: ThemeMode.system, // system | dark | light (Doc. Maestro §9)
-      home: const SessionGate(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: appThemeMode,
+      builder: (context, mode, _) => MaterialApp(
+        title: 'ONEchat',
+        debugShowCheckedModeBanner: false,
+        theme: buildOneChatLightTheme(),
+        darkTheme: buildOneChatDarkTheme(),
+        themeMode: mode, // el del perfil: system | dark | light (§9)
+        home: const SessionGate(),
+      ),
     );
   }
 }

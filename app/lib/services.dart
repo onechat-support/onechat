@@ -775,10 +775,13 @@ class OnechatService {
     });
   }
 
-  Future<void> updateMyProfile({String? bio, String? colorHex}) async {
+  Future<void> updateMyProfile(
+      {String? bio, String? colorHex, String? themeMode, String? country}) async {
     final patch = <String, dynamic>{};
     if (bio != null) patch['bio'] = bio;
     if (colorHex != null) patch['nickname_color'] = colorHex;
+    if (themeMode != null) patch['theme_mode'] = themeMode;
+    if (country != null) patch['country'] = country;
     if (patch.isEmpty) return;
     await _db.from('profiles').update(patch).eq('uid', myUid!);
   }

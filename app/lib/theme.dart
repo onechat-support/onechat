@@ -19,6 +19,20 @@ class OneChatColors {
   static const staff = Color(0xFF00E5C4);
 }
 
+/// Modo de tema activo de la app (Etapa 4). Parte en oscuro — la
+/// cara de la marca en la bienvenida — y al entrar se aplica el
+/// guardado en el perfil (system | dark | light).
+final appThemeMode = ValueNotifier<ThemeMode>(ThemeMode.dark);
+
+void applyProfileTheme(Map<String, dynamic>? profile) {
+  final saved = profile?['theme_mode'] as String?;
+  appThemeMode.value = switch (saved) {
+    'light' => ThemeMode.light,
+    'system' => ThemeMode.system,
+    _ => ThemeMode.dark,
+  };
+}
+
 ThemeData buildOneChatDarkTheme() {
   final scheme = ColorScheme.fromSeed(
     seedColor: OneChatColors.primary,

@@ -32,6 +32,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
+    applyProfileTheme(widget.profile);
     _svc.touchLastSeen();
     _refreshUnread();
     _loadGeneral();
@@ -104,7 +105,10 @@ class _HomePageState extends State<HomePage> {
       ),
       _ProfileTab(
         profile: _profile,
-        onProfileChanged: (p) => setState(() => _profile = p),
+        onProfileChanged: (p) {
+          setState(() => _profile = p);
+          applyProfileTheme(p);
+        },
       ),
     ];
     return Scaffold(
@@ -387,6 +391,27 @@ class _ProfileTabState extends State<_ProfileTab> {
     '#FFB74D', '#FFD54F', '#69F0AE', '#FF80AB',
   ];
 
+  static const _countries = [
+    'México', 'Guatemala', 'Honduras', 'El Salvador', 'Nicaragua',
+    'Costa Rica', 'Panamá', 'Cuba', 'República Dominicana',
+    'Puerto Rico', 'Colombia', 'Venezuela', 'Ecuador', 'Perú',
+    'Bolivia', 'Paraguay', 'Chile', 'Argentina', 'Uruguay', 'Brasil',
+    'Estados Unidos', 'Canadá', 'España', 'Otro',
+  ];
+
+  Future<void> _saveTheme(String mode) async {
+    await _svc.updateMyProfile(themeMode: mode);
+    final fresh = await _svc.fetchMyProfile();
+    if (fresh != null && mounted) widget.onProfileChanged(fresh);
+  }
+
+  Future<void> _saveCountry(String? country) async {
+    if (country == null) return;
+    await _svc.updateMyProfile(country: country);
+    final fresh = await _svc.fetchMyProfile();
+    if (fresh != null && mounted) widget.onProfileChanged(fresh);
+  }
+
   @override
   void dispose() {
     _bio.dispose();
@@ -446,6 +471,7 @@ class _ProfileTabState extends State<_ProfileTab> {
   }
 
   Future<void> _signOut() async {
+    appThemeMode.value = ThemeMode.dark; // la bienvenida va en oscuro
     await _svc.signOut();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
@@ -525,6 +551,28 @@ class _ProfileTabState extends State<_ProfileTab> {
           ],
         ),
         const SizedBox(height: 22),
+        const Text('Tema de la app',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        SegmentedButton<String>(
+          segments: const [
+            ButtonSegment(
+                value: 'system',
+                icon: Icon(Icons.brightness_auto_outlined),
+                label: Text('Sistema')),
+            ButtonSegment(
+                value: 'dark',
+                icon: Icon(Icons.dark_mode_outlined),
+                label: Text('Oscuro')),
+            ButtonSegment(
+                value: 'light',
+                icon: Icon(Icons.light_mode_outlined),
+                label: Text('Claro')),
+          ],
+          selected: {p['theme_mode'] as String? ?? 'system'},
+          onSelectionChanged: (s) => _saveTheme(s.first),
+        ),
+        const SizedBox(height: 22),
         TextField(
           controller: _bio,
           maxLines: 3,
@@ -535,6 +583,20 @@ class _ProfileTabState extends State<_ProfileTab> {
         FilledButton(
           onPressed: _saving ? null : _saveBio,
           child: Text(_saving ? 'Guardando…' : 'GUARDAR PERFIL'),
+        ),
+        const SizedBox(height: 22),
+        const Text('Tu país',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        DropdownButtonFormField<String>(
+          initialValue:
+              _countries.contains(p['country']) ? p['country'] as String : null,
+          decoration: const InputDecoration(labelText: 'País'),
+          items: [
+            for (final c in _countries)
+              DropdownMenuItem(value: c, child: Text(c)),
+          ],
+          onChanged: _saveCountry,
         ),
         const SizedBox(height: 18),
         OutlinedButton.icon(
