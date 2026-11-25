@@ -421,6 +421,16 @@ class _StatusTabState extends State<_StatusTab> {
         return from != null
             ? t('status.gameInviteFrom', {'from': from})
             : t('status.gameInvite');
+      case 'safety':
+        // Aviso del Bot de Seguridad (solo Staff/dueño lo reciben).
+        final level = '${p['level'] ?? ''}';
+        if (from == null) {
+          return t('status.safetyGeneric', {'level': level});
+        }
+        return room != null
+            ? t('status.safetyRoom',
+                {'level': level, 'from': from, 'room': room})
+            : t('status.safetyPrivate', {'level': level, 'from': from});
       default:
         return t('status.system');
     }
@@ -436,6 +446,8 @@ class _StatusTabState extends State<_StatusTab> {
         return Icons.chat_bubble_outline;
       case 'game_invite':
         return Icons.sports_esports;
+      case 'safety':
+        return Icons.shield_outlined;
       default:
         return Icons.notifications_none;
     }
