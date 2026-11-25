@@ -131,8 +131,11 @@ verificación). **Parte 2:** lo agendado para implementar.
     Comunidad, W2 páginas personales con **Galería** de
     fotos (3 gratis, ilimitadas Premium — el término
     «fotolog» quedó eliminado por decisión de Mario), W3
-    foro, W4 vitrina Premium y dominio propio. Pendiente:
-    la aprobación del plan y sus 5 decisiones de alcance.
+    foro, W4 vitrina Premium y dominio propio.
+    **CONSTRUIDA y en vivo el 2026-11-24 (fases W1+W2):**
+    https://onechat-support.github.io/ con el chat en
+    /chat/; Comunidad y Galería funcionando. Quedan W3
+    (foro) y W4 (vitrina Premium + dominio propio).
 19. **Seguridad antitóxicos, fases siguientes:** S2
     anti-evasión (cuentas hermanas visibles en la ficha,
     límite de invitados por dispositivo/IP, bloqueo de
@@ -149,8 +152,9 @@ verificación). **Parte 2:** lo agendado para implementar.
 - **Fotos de perfil:** el tester preguntó si llegan
   «mañana»; sin fecha prometida (se enlaza con la Galería
   de la web oficial, W2).
-- **Web oficial:** aprobación del plan y las 5 decisiones
-  (alcance inicial, visibilidad del directorio, foro,
-  dominio, si la foto principal cuenta en las 3).
+- **Web oficial:** RESUELTO el 2026-11-24 — Mario aprobó
+  el plan y la web quedó construida (W1+W2, en vivo).
+  Quedan por decidir W3 (foro) y W4 (vitrina Premium +
+  dominio propio), cuando él lo indique.
 - **Etapa 6:** luz verde para partir con Premium y los
   juegos restantes cuando Mario lo indique.

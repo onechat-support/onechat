@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'config.dart';
 import 'device_identity.dart';
 import 'strings.dart';
 
@@ -948,6 +949,65 @@ class OnechatService {
       'room_id': roomId,
       'reason': reason,
     });
+  }
+
+  // ---------- Centro de reportes y conducta (v1.17) ----------
+
+  /// Envía un reporte del centro (error | user | abuse). La evidencia
+  /// la captura la función del servidor, no el cliente.
+  Future<int> submitReport({
+    required String kind,
+    String? targetUid,
+    String? roomId,
+    required String description,
+  }) async {
+    final r = await _db.rpc('submit_report', params: {
+      'p_kind': kind,
+      'p_target': targetUid,
+      'p_room': roomId,
+      'p_description': description,
+      'p_app_version': AppConfig.appVersion,
+    });
+    return (r as num).toInt();
+  }
+
+  /// Reportes visibles para mí según mi alcance (RLS del servidor).
+  Future<List<Map<String, dynamic>>> fetchReportsCenter() async {
+    final rows = await _db
+        .from('reports_center')
+        .select()
+        .order('created_at', ascending: false)
+        .limit(100);
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
+  /// Cambia el estado de un reporte (review | resolved | dismissed).
+  Future<bool> resolveReport(int id, String status, {String? note}) async {
+    final r = await _db.rpc('resolve_report', params: {
+      'p_id': id,
+      'p_status': status,
+      'p_note': note,
+    });
+    return r == true;
+  }
+
+  /// Mi situación de poder: {has_power, conduct_accepted,
+  /// center_visible, is_owner}.
+  Future<Map<String, dynamic>> myPowerStatus() async {
+    final r = await _db.rpc('my_power_status');
+    if (r is Map) return Map<String, dynamic>.from(r);
+    return {
+      'has_power': false,
+      'conduct_accepted': true,
+      'center_visible': false,
+      'is_owner': false,
+    };
+  }
+
+  /// Registra mi aceptación del código de conducta.
+  Future<bool> acceptConduct() async {
+    final r = await _db.rpc('accept_conduct');
+    return r == true;
   }
 
   /// Traduce un mensaje al idioma del usuario (Etapa 5, DeepL en

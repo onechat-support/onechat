@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'dm_pages.dart';
+import 'report_pages.dart';
 import 'services.dart';
 import 'strings.dart';
 import 'theme.dart';
@@ -681,6 +682,15 @@ class _ChatPageState extends State<ChatPage> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.flag_outlined),
+            tooltip: t('report.button'),
+            onPressed: () => showReportSheet(
+              context,
+              roomId: widget.room['id'] as String,
+              roomName: widget.room['name'] as String,
+            ),
+          ),
           if (_canModerate)
             IconButton(
               icon: const Icon(Icons.shield_outlined),

@@ -5,6 +5,7 @@ import 'chat_page.dart';
 import 'config.dart';
 import 'dm_pages.dart';
 import 'main.dart';
+import 'report_pages.dart';
 import 'revoked_page.dart';
 import 'services.dart';
 import 'strings.dart';
@@ -61,6 +62,11 @@ class _HomePageState extends State<HomePage> {
     });
     _refreshUnread();
     _loadGeneral();
+    // Si tengo poder y aún no acepté el código de conducta, se me
+    // presenta una vez por sesión (v1.17).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) maybeShowConduct(context);
+    });
     // Avisos en vivo: si me escriben o me llega una notificación
     // estando en cualquier pestaña, los contadores se actualizan
     // solos (antes solo cambiaban al entrar a Privados o Status).
@@ -358,6 +364,17 @@ class _StatusTab extends StatefulWidget {
 class _StatusTabState extends State<_StatusTab> {
   final _svc = OnechatService();
   late Future<List<Map<String, dynamic>>> _items = _load();
+  bool _centerVisible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _svc.myPowerStatus().then((st) {
+      if (mounted) {
+        setState(() => _centerVisible = st['center_visible'] == true);
+      }
+    }).catchError((_) {});
+  }
 
   /// Recarga al volver a la pestaña (la pila de pestañas la mantiene
   /// viva, así que sin esto la lista quedaría vieja).
@@ -464,8 +481,21 @@ class _StatusTabState extends State<_StatusTab> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: _items,
+    return Column(
+      children: [
+        if (_centerVisible) ...[
+          ListTile(
+            leading: const Icon(Icons.flag_outlined),
+            title: Text(t('center.open')),
+            trailing: const Icon(Icons.chevron_right, size: 18),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const ReportCenterPage())),
+          ),
+          const Divider(height: 1),
+        ],
+        Expanded(
+          child: FutureBuilder<List<Map<String, dynamic>>>(
+            future: _items,
       builder: (context, snap) {
         if (snap.connectionState != ConnectionState.done) {
           return const Center(child: CircularProgressIndicator());
@@ -505,6 +535,9 @@ class _StatusTabState extends State<_StatusTab> {
           },
         );
       },
+          ),
+        ),
+      ],
     );
   }
 }
@@ -812,6 +845,12 @@ class _ProfileTabState extends State<_ProfileTab> {
               DropdownMenuItem(value: c, child: Text(_countryLabel(c))),
           ],
           onChanged: _saveCountry,
+        ),
+        const SizedBox(height: 26),
+        OutlinedButton.icon(
+          onPressed: () => showReportSheet(context),
+          icon: const Icon(Icons.flag_outlined),
+          label: Text(t('report.button')),
         ),
         if (_isRegistered) ...[
           const SizedBox(height: 26),

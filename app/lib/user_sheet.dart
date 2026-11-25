@@ -1,6 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import 'config.dart';
+import 'report_pages.dart';
 import 'services.dart';
 import 'strings.dart';
 import 'theme.dart';
@@ -347,37 +348,20 @@ class _UserSheetState extends State<_UserSheet> {
     );
   }
 
-  Future<void> _report() async {
-    final reasonCtrl = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(t('sheet.reportTitle')),
-        content: TextField(
-          controller: reasonCtrl,
-          maxLines: 3,
-          decoration: InputDecoration(
-            labelText: t('sheet.reportReason'),
-            hintText: t('sheet.reportHint'),
-          ),
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: Text(t('sheet.cancel'))),
-          FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text(t('sheet.reportSend'))),
-        ],
-      ),
-    );
-    final reason = reasonCtrl.text.trim();
-    if (ok != true || reason.isEmpty) return;
-    await _svc.report(targetUid: _uid, roomId: widget.roomId, reason: reason);
-    if (!mounted) return;
-    Navigator.pop(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(t('sheet.reported'))),
+  /// Abre el centro de reportes con esta persona ya elegida. Si tiene
+  /// poder, el selector ofrece también «abuso de poder» (v1.17).
+  void _openReport() {
+    final globalRole = widget.profile['global_role'] as String?;
+    final memberRole = _member?['role'] as String?;
+    final hasPower = globalRole == 'staff' ||
+        globalRole == 'owner' ||
+        memberRole == 'owner' ||
+        memberRole == 'moderator';
+    showReportSheet(
+      context,
+      roomId: widget.roomId,
+      presetTarget: widget.profile,
+      targetHasPower: hasPower,
     );
   }
 
@@ -480,7 +464,7 @@ class _UserSheetState extends State<_UserSheet> {
                   label: Text(t('sheet.block')),
                 ),
                 OutlinedButton.icon(
-                  onPressed: _busy ? null : _report,
+                  onPressed: _busy ? null : _openReport,
                   icon: const Icon(Icons.flag_outlined),
                   label: Text(t('sheet.report')),
                 ),
