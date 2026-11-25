@@ -8,11 +8,11 @@
 class AppConfig {
   /// Sello visible de la versión (Perfil): sirve para confirmar
   /// qué tan fresca es la copia que el navegador está ejecutando.
-  static const appVersion = '2026.11.25.1';
+  static const appVersion = '2026.11.25.2';
 
   /// Sitio oficial (lugar web definitivo): portada, Comunidad
   /// y páginas personales con Galería en `/u/<nickname>`.
-  static const siteBaseUrl = 'https://onechat-support.github.io';
+  static const siteBaseUrl = 'https://getonechat.com';
 
   static const supabaseUrl = 'https://jsdyoqmgdkqlkucebjmt.supabase.co';
   static const supabasePublishableKey =
