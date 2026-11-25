@@ -39,7 +39,7 @@ class RevokedPage extends StatelessWidget {
                   ClipRRect(
                     borderRadius: BorderRadius.circular(18),
                     child: Image.asset(
-                      'assets/logo_onechat.jpg',
+                      'assets/logo_onechat.png',
                       fit: BoxFit.fitWidth,
                       semanticLabel: 'ONEchat',
                     ),

@@ -223,13 +223,13 @@ class _WelcomePageState extends State<WelcomePage> {
                         ),
                     ],
                   ),
-                  // Logo definitivo de la plataforma (Mario,
-                  // 2026-11-24): wordmark blanco sobre el degradado
-                  // oficial, con la píldora de Early Access.
+                  // Logo de la plataforma (Mario, 2026-11-25):
+                  // letras blancas con la píldora de Early Access,
+                  // sin recuadro de fondo (PNG transparente).
                   ClipRRect(
                     borderRadius: BorderRadius.circular(18),
                     child: Image.asset(
-                      'assets/logo_onechat.jpg',
+                      'assets/logo_onechat.png',
                       fit: BoxFit.fitWidth,
                       semanticLabel: 'ONEchat',
                     ),

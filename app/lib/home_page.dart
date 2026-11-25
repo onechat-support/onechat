@@ -176,12 +176,13 @@ class _HomePageState extends State<HomePage> {
       appBar: _tab == 0
           ? null
           : AppBar(
-              // La marca en la barra: el logo oficial (Mario,
-              // 2026-11-24), presente en todo el interior.
+              // La marca en la barra: solo las letras del logo
+              // (Mario, 2026-11-25); a 32 px la píldora no se
+              // leería, la versión completa vive en la bienvenida.
               title: ClipRRect(
                 borderRadius: BorderRadius.circular(7),
                 child: Image.asset(
-                  'assets/logo_onechat.jpg',
+                  'assets/logo_letras.png',
                   height: 32,
                   fit: BoxFit.fitHeight,
                   semanticLabel: 'ONEchat',
