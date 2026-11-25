@@ -1,8 +1,10 @@
 import 'package:material_ui/material_ui.dart';
 
+import 'config.dart';
 import 'services.dart';
 import 'strings.dart';
 import 'theme.dart';
+import 'web_links.dart';
 
 Color nickColor(String? hex) {
   if (hex == null || hex.length != 7 || !hex.startsWith('#')) {
@@ -482,6 +484,13 @@ class _UserSheetState extends State<_UserSheet> {
                   icon: const Icon(Icons.flag_outlined),
                   label: Text(t('sheet.report')),
                 ),
+                if (!isGuest)
+                  OutlinedButton.icon(
+                    onPressed: () => openExternalUrl(
+                        '${AppConfig.siteBaseUrl}/u/${Uri.encodeComponent(p['nickname'] as String)}'),
+                    icon: const Icon(Icons.open_in_new, size: 18),
+                    label: Text(t('sheet.viewPage')),
+                  ),
               ],
             ),
             if (widget.roomId != null && widget.canModerate) ...[

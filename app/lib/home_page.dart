@@ -10,6 +10,7 @@ import 'services.dart';
 import 'strings.dart';
 import 'theme.dart';
 import 'user_sheet.dart';
+import 'web_links.dart';
 
 /// Pantalla principal del MVP: pestañas Salas · Status · Perfil.
 class HomePage extends StatefulWidget {
@@ -521,6 +522,56 @@ class _ProfileTabState extends State<_ProfileTab> {
   final _svc = OnechatService();
   late final _bio = TextEditingController(text: widget.profile['bio'] as String? ?? '');
   bool _saving = false;
+  List<Map<String, dynamic>> _gallery = [];
+  bool _uploading = false;
+
+  bool get _isRegistered => widget.profile['is_guest'] != true;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_isRegistered) _loadGallery();
+  }
+
+  Future<void> _loadGallery() async {
+    try {
+      final rows = await _svc.myGallery();
+      if (mounted) setState(() => _gallery = rows);
+    } catch (_) {
+      // La Galería es un extra web: si falla, el Perfil sigue.
+    }
+  }
+
+  Future<void> _saveDirectory(bool value) async {
+    await _svc.updateMyProfile(showInDirectory: value);
+    final fresh = await _svc.fetchMyProfile();
+    if (fresh != null && mounted) widget.onProfileChanged(fresh);
+  }
+
+  String get _myPageUrl =>
+      '${AppConfig.siteBaseUrl}/u/${Uri.encodeComponent(widget.profile['nickname'] as String)}';
+
+  Future<void> _addPhoto() async {
+    final picked = await pickImageBytes();
+    if (picked == null || !mounted) return;
+    setState(() => _uploading = true);
+    try {
+      await _svc.uploadGalleryPhoto(picked.$1, picked.$2);
+      await _loadGallery();
+    } catch (e) {
+      if (!mounted) return;
+      final limit = e.toString().contains('gallery_limit');
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(limit ? t('profile.photoLimit') : '$e')));
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  Future<void> _deletePhoto(Map<String, dynamic> photo) async {
+    await _svc.deleteGalleryPhoto(photo);
+    await _loadGallery();
+  }
 
   static const _palette = [
     '#00C2A8', '#4F8CFF', '#FF5252', '#B388FF',
@@ -762,6 +813,81 @@ class _ProfileTabState extends State<_ProfileTab> {
           ],
           onChanged: _saveCountry,
         ),
+        if (_isRegistered) ...[
+          const SizedBox(height: 26),
+          Text(t('profile.webSection'),
+              style: const TextStyle(fontWeight: FontWeight.bold)),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(t('profile.directory')),
+            subtitle: Text(t('profile.directoryHint')),
+            value: p['show_in_directory'] != false,
+            onChanged: _saveDirectory,
+          ),
+          OutlinedButton.icon(
+            onPressed: () => openExternalUrl(_myPageUrl),
+            icon: const Icon(Icons.open_in_new),
+            label: Text(t('profile.viewPage')),
+          ),
+          const SizedBox(height: 18),
+          Text(t('profile.gallery'),
+              style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(t('profile.galleryHint'),
+              style: TextStyle(
+                  fontSize: 12.5,
+                  color:
+                      Theme.of(context).colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              for (final photo in _gallery)
+                Stack(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        photo['url'] as String,
+                        width: 84,
+                        height: 84,
+                        fit: BoxFit.cover,
+                        errorBuilder: (ctx, err, stack) => Container(
+                          width: 84,
+                          height: 84,
+                          color: Colors.black12,
+                          child: const Icon(Icons.broken_image_outlined),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      top: 2,
+                      right: 2,
+                      child: IconButton(
+                        iconSize: 18,
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.black54,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.all(4),
+                          minimumSize: const Size(28, 28),
+                        ),
+                        icon: const Icon(Icons.close),
+                        tooltip: t('profile.deletePhoto'),
+                        onPressed: () => _deletePhoto(photo),
+                      ),
+                    ),
+                  ],
+                ),
+              OutlinedButton.icon(
+                onPressed: _uploading ? null : _addPhoto,
+                icon: const Icon(Icons.add_a_photo_outlined),
+                label: Text(
+                    _uploading ? t('profile.uploading') : t('profile.addPhoto')),
+              ),
+            ],
+          ),
+        ],
         const SizedBox(height: 18),
         OutlinedButton.icon(
           onPressed: _showBlocked,

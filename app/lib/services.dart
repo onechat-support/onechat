@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -1074,14 +1075,59 @@ class OnechatService {
       String? colorHex,
       String? themeMode,
       String? country,
-      String? language}) async {
+      String? language,
+      bool? showInDirectory}) async {
     final patch = <String, dynamic>{};
     if (bio != null) patch['bio'] = bio;
     if (colorHex != null) patch['nickname_color'] = colorHex;
     if (themeMode != null) patch['theme_mode'] = themeMode;
     if (country != null) patch['country'] = country;
     if (language != null) patch['language'] = language;
+    if (showInDirectory != null) {
+      patch['show_in_directory'] = showInDirectory;
+    }
     if (patch.isEmpty) return;
     await _db.from('profiles').update(patch).eq('uid', myUid!);
+  }
+
+  // ---------- Galería (web oficial W2) ----------
+
+  Future<List<Map<String, dynamic>>> myGallery() async {
+    final rows = await _db
+        .from('gallery_photos')
+        .select()
+        .eq('uid', myUid!)
+        .order('created_at');
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
+  /// Sube una foto a la Galería propia (bucket «gallery»,
+  /// carpeta `<uid>/`). El límite de 3 gratis lo impone el
+  /// servidor: si se alcanza, lanza con mensaje gallery_limit.
+  Future<void> uploadGalleryPhoto(List<int> bytes, String fileName) async {
+    final ext = fileName.contains('.')
+        ? fileName.split('.').last.toLowerCase().replaceAll(
+            RegExp(r'[^a-z0-9]'), '')
+        : 'jpg';
+    final safeExt = ext.isEmpty ? 'jpg' : ext;
+    final path =
+        '$myUid/${DateTime.now().millisecondsSinceEpoch}.$safeExt';
+    await _db.storage.from('gallery').uploadBinary(
+          path,
+          bytes is Uint8List ? bytes : Uint8List.fromList(bytes),
+        );
+    final url = _db.storage.from('gallery').getPublicUrl(path);
+    await _db.from('gallery_photos').insert({'uid': myUid, 'url': url});
+  }
+
+  Future<void> deleteGalleryPhoto(Map<String, dynamic> photo) async {
+    final url = photo['url'] as String;
+    final marker = '/object/public/gallery/';
+    final idx = url.indexOf(marker);
+    if (idx >= 0) {
+      final path = Uri.decodeComponent(url.substring(idx + marker.length));
+      await _db.storage.from('gallery').remove([path]);
+    }
+    await _db.from('gallery_photos').delete().eq('id', photo['id']);
   }
 }

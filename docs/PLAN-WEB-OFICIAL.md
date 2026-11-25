@@ -13,13 +13,13 @@ Un sitio oficial que es la **casa pública** de ONEchat: la
 portada presenta la marca (el logo nuevo), permite **entrar
 al chat directo desde la página principal**, y muestra la
 **comunidad** — el directorio de usuarios registrados y las
-**páginas personales estilo fotolog** vinculadas al perfil
+**páginas personales con galería de fotos** vinculadas al perfil
 del chat — con un **foro** como espacio de conversación con
 memoria.
 
 Por qué suma: el chat es efímero y cerrado (hay que estar
 dentro); la web es **descubrible** (Google, enlaces que se
-comparten, páginas de usuario que circulan). Cada fotolog
+comparten, páginas de usuario que circulan). Cada página personal
 compartido es publicidad gratuita que trae gente al chat.
 
 ## 2. Mapa del sitio propuesto
@@ -40,7 +40,7 @@ compartido es publicidad gratuita que trae gente al chat.
   (en línea / última vez). Buscador por nickname y filtro
   por país. Orden sugerido: en línea primero, luego más
   activos, luego más nuevos.
-- **Página personal (fotolog) — /u/Nickname:** la página de
+- **Página personal con su Galería — /u/Nickname:** la página de
   cada usuario registrado: foto principal, bio, país,
   insignias del chat, su **galería de fotos** y botones
   «Enviar mensaje» / «Ver en el chat» que abren la app en su
@@ -59,7 +59,7 @@ compartido es publicidad gratuita que trae gente al chat.
   temas). Aviso en la app cuando hay respuestas a tus temas
   (una notificación más en Status).
 - **Premium (vitrina):** qué incluye la membresía — fotos
-  ilimitadas en el fotolog, «Cine juntos», insignia Premium
+  ilimitadas en la Galería, «Cine juntos», insignia Premium
   y lo que definamos en la Etapa 6 — con captación de
   interés («Avísame cuando abra»). Sin cobros todavía: el
   sistema de pago es parte de la Etapa 6 y requiere las
@@ -76,9 +76,9 @@ compartido es publicidad gratuita que trae gente al chat.
   «Entrar al chat», enlaces, estados en línea). La app
   mantiene su tema oscuro: el contraste es deliberado —
   la web es la vitrina luminosa; el chat, el interior.
-- **Fotolog como protagonista visual:** tarjetas grandes
+- **La Galería como protagonista visual:** tarjetas grandes
   con foto, rejilla de galería limpia, página personal con
-  cabecera amplia — el espíritu fotolog (perfil que se
+  cabecera amplia — el espíritu de la página personal (perfil que se
   visita y se comparte) actualizado a estándar moderno.
 - **Móvil primero:** la mayoría llegará por el teléfono y
   por enlaces compartidos; el sitio se diseña primero para
@@ -110,7 +110,7 @@ compartido es publicidad gratuita que trae gente al chat.
   a él (p. ej. la portada en el dominio raíz y el chat en
   /chat o chat.dominio) sin rehacer nada.
 - **Vínculo app ↔ web:** enlaces profundos — la ficha del
-  usuario en la app abre su fotolog; el fotolog abre la app
+  usuario en la app abre su página con su Galería; la página abre la app
   en la conversación con esa persona (si no tiene cuenta,
   lo invita a registrarse con ese nickname de destino ya
   abierto al entrar).
@@ -121,7 +121,7 @@ compartido es publicidad gratuita que trae gente al chat.
   portada con el logo, botón/embebido del chat, franja de
   presencia y el directorio de registrados con buscador.
   Es la cara pública mínima y ya enlaza todo lo que existe.
-- **Fase W2 — Fotolog:** páginas /u/Nickname con galería
+- **Fase W2 — Galería:** páginas /u/Nickname con galería
   (3 fotos gratis), subida de fotos desde el Perfil de la
   app, interruptor de privacidad y el enlace «Ver su
   página» en la ficha del usuario dentro de la app.
@@ -146,8 +146,8 @@ compartido es publicidad gratuita que trae gente al chat.
 ## 7. Decisiones que necesito de Mario para partir
 
 1. **Alcance de la primera entrega:** ¿partimos con W1
-   sola, o con W1 + W2 (portada, comunidad y fotolog de una
-   vez)? Mi recomendación: **W1 + W2** — el fotolog es el
+   sola, o con W1 + W2 (portada, comunidad y galería de una
+   vez)? Mi recomendación: **W1 + W2** — la galería es la
    gancho que hace compartible al sitio.
 2. **Visibilidad del directorio:** ¿toda persona registrada
    aparece por defecto (pudiendo ocultarse), o solo quien
@@ -157,14 +157,14 @@ compartido es publicidad gratuita que trae gente al chat.
    usuario.
 3. **Foro:** ¿en la primera etapa o queda para W3 como
    está planteado? Mi recomendación: **W3** — primero la
-   comunidad y el fotolog; el foro rinde cuando ya hay
+   comunidad y la galería; el foro rinde cuando ya hay
    comunidad que lo habite.
 4. **Dominio:** ¿lo vemos ahora (te traigo opciones de
    nombre y precio verificadas) o el sitio nace en la
    dirección actual de GitHub y el dominio se decide en
    W4? Mi recomendación: **nacer ya y decidir el dominio en
    paralelo**, sin bloquear el lanzamiento.
-5. **Fotos del fotolog:** ¿las 3 fotos gratuitas son solo
+5. **Fotos de la Galería:** ¿las 3 fotos gratuitas son solo
    galería, o la foto principal de la página cuenta dentro
    de las 3? Mi recomendación: **la principal no cuenta**
    (es el avatar grande de la página); las 3 son de
