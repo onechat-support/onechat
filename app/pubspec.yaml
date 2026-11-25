@@ -56,6 +56,10 @@ flutter:
   assets:
     - assets/logo_onechat.png
     - assets/logo_letras.png
+    # El JPG original queda publicado como respaldo: las copias de la
+    # app que el navegador tenga en caché (versiones anteriores) lo
+    # siguen pidiendo; si falta, esas copias se quedan sin logo.
+    - assets/logo_onechat.jpg
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
