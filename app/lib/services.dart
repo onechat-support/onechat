@@ -229,6 +229,31 @@ class OnechatService {
     );
   }
 
+  /// Elimina la cuenta del usuario actual (requisito de Google
+  /// Play: borrado desde la app; también existe desde la web).
+  /// El servidor verifica la contraseña en las cuentas
+  /// registradas y borra todo: perfil, mensajes, fotos de la
+  /// Galería y el usuario de acceso. Los invitados se borran
+  /// solo con su sesión.
+  Future<void> deleteMyAccount({String? password}) async {
+    try {
+      final res = await _db.functions.invoke(
+        'delete-account',
+        body: {if (password != null) 'password': password},
+      );
+      final data = res.data;
+      if (data is Map && data['error'] != null) {
+        throw Exception(data['error'].toString());
+      }
+    } on FunctionException catch (e) {
+      final details = e.details;
+      if (details is Map && details['error'] != null) {
+        throw Exception(details['error'].toString());
+      }
+      rethrow;
+    }
+  }
+
   /// Al salir, el invitado libera su nickname borrando su perfil;
   /// las cuentas registradas conservan el suyo (está reservado).
   Future<void> signOut() async {

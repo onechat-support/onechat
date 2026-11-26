@@ -82,15 +82,29 @@ v1.20 o en un paso posterior.
 
 ## Estado
 
-Informe entregado al propietario el 2026-11-25. Correcciones listas
-para aplicar cuando él lo apruebe (archivos ya escritos y revisados
-contra el esquema real):
-- `supabase/schema_v1_20a_correo.sql` (revoca la lectura de
-  profiles.email).
-- `supabase/schema_v1_20b_limite.sql` (gatillo de 30 mensajes/minuto
-  por usuario en las tres tablas de mensajes).
-- `supabase/schema_v1_20c_limpieza_auditoria.sql` (elimina los
-  invitados y mensajes de esta auditoría).
-Tras aplicarlas, repetir la batería de permisos para confirmar que el
-correo ya no se lee por API y que el envío normal de mensajes sigue
-funcionando.
+Informe entregado al propietario el 2026-11-25 y correcciones
+APLICADAS el mismo día con su aprobación («Aplicar todas las
+correcciones ahora»), todo verificado en vivo:
+
+- **Migración v1.20** (`supabase/schema_v1_20_seguridad.sql`):
+  (a) el correo deja de ser legible por la API. Lección: el permiso
+  original era a nivel de TABLA (v1.1), así que un revoke por
+  columna no bastó — la primera aplicación no hizo efecto y la
+  verificación lo cazó; la forma aplicada revoca el select de
+  tabla y lo re-otorga por columnas (las 19 públicas, sin email).
+  Consecuencia: pedir perfiles con * ahora falla entero, por lo
+  que la app (v2026.11.25.6) pide los perfiles con la lista
+  explícita `profileColumns` de services.dart. El registro sigue
+  pudiendo GUARDAR el correo (permiso de inserción intacto) y el
+  ingreso por nickname no se afectó (lee con clave de servicio).
+  (b) límite de velocidad: gatillo de 30 mensajes por 60 segundos
+  por usuario sumando salas, privados y susurros; verificado
+  (30 pasan, el 31.º se rechaza).
+- **Traducción**: la función `translate` ahora exige sesión
+  válida (verificado: sin sesión responde 401; con sesión de
+  invitado traduce normal).
+- **Limpieza**: cuentas y mensajes de la auditoría y de la
+  verificación eliminados (0 filas restantes, comprobado).
+- **Higiene local**: `.alpha/session.json` y `.alpha/state.json`
+  salieron del control de versiones (repo sin remoto; nunca
+  salieron de esta máquina) y quedaron en .gitignore.

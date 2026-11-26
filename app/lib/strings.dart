@@ -155,6 +155,19 @@ const _es = {
   'profile.deletePhoto': 'Eliminar foto',
   'sheet.viewPage': 'Ver su página',
   'profile.signOut': 'Cerrar sesión',
+  'profile.deleteAccount': 'Eliminar mi cuenta',
+  'profile.deleteTitle': '¿Eliminar tu cuenta?',
+  'profile.deleteBody':
+      'Esto borra para siempre tu perfil, tus mensajes, tus fotos de la Galería y tus conversaciones. Tu nickname quedará libre. No se puede deshacer.',
+  'profile.deleteGuestBody':
+      'Esto borra para siempre tu perfil de invitado, tus mensajes y tus conversaciones. No se puede deshacer.',
+  'profile.deletePassword': 'Tu contraseña',
+  'profile.deleteConfirm': 'ELIMINAR PARA SIEMPRE',
+  'profile.deleteWrongPassword': 'La contraseña no coincide.',
+  'profile.deleteError':
+      'No se pudo eliminar la cuenta. Inténtalo de nuevo.',
+  'profile.deleted':
+      'Tu cuenta fue eliminada. Gracias por haber estado en ONEchat.',
   // Chat de sala
   'chat.publicRoom': 'Sala pública',
   'chat.online': '{n} en línea',
@@ -526,6 +539,18 @@ const _en = {
   'profile.deletePhoto': 'Delete photo',
   'sheet.viewPage': 'View page',
   'profile.signOut': 'Sign out',
+  'profile.deleteAccount': 'Delete my account',
+  'profile.deleteTitle': 'Delete your account?',
+  'profile.deleteBody':
+      'This permanently deletes your profile, your messages, your Gallery photos and your conversations. Your nickname will be released. This cannot be undone.',
+  'profile.deleteGuestBody':
+      'This permanently deletes your guest profile, your messages and your conversations. This cannot be undone.',
+  'profile.deletePassword': 'Your password',
+  'profile.deleteConfirm': 'DELETE FOREVER',
+  'profile.deleteWrongPassword': 'The password does not match.',
+  'profile.deleteError': 'The account could not be deleted. Try again.',
+  'profile.deleted':
+      'Your account was deleted. Thanks for being part of ONEchat.',
   'chat.publicRoom': 'Public room',
   'chat.online': '{n} online',
   'chat.occupantsTooltip': "Who's in the room",

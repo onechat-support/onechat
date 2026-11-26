@@ -729,6 +729,79 @@ class _ProfileTabState extends State<_ProfileTab> {
     );
   }
 
+  /// Eliminación de cuenta (requisito de Google Play): confirma,
+  /// pide la contraseña en cuentas registradas y llama al
+  /// servidor, que borra todo. Al terminar vuelve a la bienvenida.
+  Future<void> _confirmDeleteAccount() async {
+    final isGuest = (widget.profile['is_guest'] as bool?) ?? false;
+    final passwordCtrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t('profile.deleteTitle')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(isGuest
+                ? t('profile.deleteGuestBody')
+                : t('profile.deleteBody')),
+            if (!isGuest) ...[
+              const SizedBox(height: 14),
+              TextField(
+                controller: passwordCtrl,
+                obscureText: true,
+                decoration: InputDecoration(
+                    labelText: t('profile.deletePassword')),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(t('welcome.cancel')),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+                backgroundColor: Colors.redAccent),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(t('profile.deleteConfirm')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await _svc.deleteMyAccount(
+          password: isGuest ? null : passwordCtrl.text);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(t('profile.deleted'))),
+      );
+      appThemeMode.value = ThemeMode.dark;
+      try {
+        await _svc.signOut();
+      } catch (_) {
+        // La sesión ya no existe en el servidor: es lo esperado.
+      }
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const SessionGate()),
+        (_) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final wrong = e.toString().contains('invalid_password') ||
+          e.toString().contains('password_required');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(wrong
+                ? t('profile.deleteWrongPassword')
+                : t('profile.deleteError'))),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = widget.profile;
@@ -951,6 +1024,14 @@ class _ProfileTabState extends State<_ProfileTab> {
           onPressed: _signOut,
           icon: const Icon(Icons.logout),
           label: Text(t('profile.signOut')),
+        ),
+        const SizedBox(height: 26),
+        TextButton.icon(
+          onPressed: _confirmDeleteAccount,
+          icon: const Icon(Icons.delete_forever_outlined,
+              color: Colors.redAccent),
+          label: Text(t('profile.deleteAccount'),
+              style: const TextStyle(color: Colors.redAccent)),
         ),
         const SizedBox(height: 18),
         Center(
