@@ -85,7 +85,7 @@ class OnechatService {
           'language': appLanguage.value,
           'last_seen_at': DateTime.now().toUtc().toIso8601String(),
         })
-        .select()
+        .select(profileColumns)
         .single();
     if (!isGuest) {
       await _db.from('nickname_reservations').insert({
