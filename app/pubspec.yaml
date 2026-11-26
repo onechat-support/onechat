@@ -56,6 +56,9 @@ flutter:
   assets:
     - assets/logo_onechat.png
     - assets/logo_letras.png
+    - assets/sounds/send.wav
+    - assets/sounds/receive.wav
+    - assets/sounds/mention.wav
     # El JPG original queda publicado como respaldo: las copias de la
     # app que el navegador tenga en caché (versiones anteriores) lo
     # siguen pidiendo; si falta, esas copias se quedan sin logo.

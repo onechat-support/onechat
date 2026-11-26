@@ -1,10 +1,13 @@
+import 'package:flutter/services.dart' as fservices;
 import 'package:material_ui/material_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'fx.dart';
 import 'services.dart';
 import 'strings.dart';
 import 'theme.dart';
 import 'user_sheet.dart';
+import 'youtube_card.dart';
 
 String _when(String? iso) {
   if (iso == null) return '';
@@ -177,7 +180,8 @@ class DmChatPage extends StatefulWidget {
   State<DmChatPage> createState() => _DmChatPageState();
 }
 
-class _DmChatPageState extends State<DmChatPage> {
+class _DmChatPageState extends State<DmChatPage>
+    with WidgetsBindingObserver {
   final _svc = OnechatService();
   final _input = TextEditingController();
   final _scroll = ScrollController();
@@ -196,9 +200,27 @@ class _DmChatPageState extends State<DmChatPage> {
 
   String get _otherUid => widget.other['uid'] as String;
 
+  // Lote C: teclado (punto 5) y sonidos (punto 16), como en salas.
+  double _lastInset = 0;
+  bool get _soundOn => widget.myProfile['sound_enabled'] != false;
+
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    final view = WidgetsBinding.instance.platformDispatcher.views.first;
+    final inset = view.viewInsets.bottom / view.devicePixelRatio;
+    final opened = inset > _lastInset + 80;
+    _lastInset = inset;
+    if (opened) {
+      Future.delayed(const Duration(milliseconds: 280), _jumpToBottom);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    setWakelock(true);
     _init();
   }
 
@@ -236,6 +258,7 @@ class _DmChatPageState extends State<DmChatPage> {
       });
       _jumpToBottom();
       if (row['sender_uid'] != _svc.myUid) {
+        if (_soundOn) playSound('receive');
         _svc.markConversationRead(widget.conversationId);
       }
     });
@@ -249,13 +272,34 @@ class _DmChatPageState extends State<DmChatPage> {
       context: context,
       showDragHandle: true,
       builder: (_) => SafeArea(
-        child: ListTile(
-          leading: const Icon(Icons.translate),
-          title: Text(has ? t('chat.showOriginal') : t('chat.translate')),
-          onTap: () => Navigator.pop(context, 'go'),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.content_copy),
+              title: Text(t('chat.copy')),
+              onTap: () => Navigator.pop(context, 'copy'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.translate),
+              title:
+                  Text(has ? t('chat.showOriginal') : t('chat.translate')),
+              onTap: () => Navigator.pop(context, 'go'),
+            ),
+          ],
         ),
       ),
     );
+    if (action == 'copy') {
+      await fservices.Clipboard.setData(
+          fservices.ClipboardData(text: body));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(t('chat.copied'))),
+        );
+      }
+      return;
+    }
     if (action != 'go' || !mounted) return;
     if (has) {
       setState(() => _translations.remove(id));
@@ -292,6 +336,8 @@ class _DmChatPageState extends State<DmChatPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    setWakelock(false);
     final ch = _channel;
     if (ch != null) _svc.unsubscribe(ch);
     final gch = _gameChannel;
@@ -323,6 +369,7 @@ class _DmChatPageState extends State<DmChatPage> {
         otherUid: _otherUid,
         body: text,
       );
+      if (_soundOn) playSound('send');
       final realId = inserted['id'];
       if (realId is int) _knownIds.add(realId);
       if (!mounted) return;
@@ -344,7 +391,10 @@ class _DmChatPageState extends State<DmChatPage> {
       if (!mounted) return;
       setState(() => _messages.remove(temp));
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(t('chat.sendFailed', {'e': '$e'}))),
+        SnackBar(
+            content: Text('$e'.contains('dm_closed')
+                ? t('chat.dmClosed')
+                : t('chat.sendFailed', {'e': '$e'}))),
       );
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -645,7 +695,10 @@ class _DmChatPageState extends State<DmChatPage> {
                                 m['id'] as int, m['body'] as String? ?? ''),
                             child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 4),
-                            child: RichText(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                RichText(
                               text: TextSpan(
                                 style: DefaultTextStyle.of(context).style,
                                 children: [
@@ -674,6 +727,18 @@ class _DmChatPageState extends State<DmChatPage> {
                                     ),
                                 ],
                               ),
+                            ),
+                                if (youtubeIdFromText(
+                                        m['body'] as String? ?? '') !=
+                                    null)
+                                  ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                        maxWidth: 340),
+                                    child: YoutubeCard(
+                                        videoId: youtubeIdFromText(
+                                            m['body'] as String)!),
+                                  ),
+                              ],
                             ),
                           ),
                           );

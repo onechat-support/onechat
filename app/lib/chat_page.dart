@@ -1,12 +1,15 @@
+import 'package:flutter/services.dart' as fservices;
 import 'package:material_ui/material_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'dm_pages.dart';
+import 'fx.dart';
 import 'report_pages.dart';
 import 'services.dart';
 import 'strings.dart';
 import 'theme.dart';
 import 'user_sheet.dart';
+import 'youtube_card.dart';
 
 /// Sala de chat (MVP): historial + tiempo real + presencia básica.
 /// Los mensajes de usuarios bloqueados no se muestran.
@@ -34,7 +37,7 @@ class ChatPage extends StatefulWidget {
   State<ChatPage> createState() => _ChatPageState();
 }
 
-class _ChatPageState extends State<ChatPage> {
+class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   final _svc = OnechatService();
   final _input = TextEditingController();
   final _inputFocus = FocusNode();
@@ -82,9 +85,57 @@ class _ChatPageState extends State<ChatPage> {
 
   String get _roomId => widget.room['id'] as String;
 
+  // Lote C: última altura del teclado (para subir la conversación
+  // cuando se abre, punto 5) y freno del sonido de recepción.
+  double _lastInset = 0;
+  DateTime _lastReceiveSound = DateTime.fromMillisecondsSinceEpoch(0);
+
+  bool get _soundOn => widget.myProfile['sound_enabled'] != false;
+  bool get _vibrateOn => widget.myProfile['vibrate_enabled'] != false;
+
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    final view =
+        WidgetsBinding.instance.platformDispatcher.views.first;
+    final inset = view.viewInsets.bottom / view.devicePixelRatio;
+    final opened = inset > _lastInset + 80;
+    _lastInset = inset;
+    if (opened) {
+      // El teclado terminó de abrir: la conversación sube con él.
+      Future.delayed(const Duration(milliseconds: 280), _jumpToBottom);
+    }
+  }
+
+  /// Sonidos del chat (punto 16): mención (con vibración) y
+  /// recepción con freno para salas movidas.
+  void _soundForIncoming(Map<String, dynamic> row, {bool whisper = false}) {
+    if (!_soundOn && !_vibrateOn) return;
+    final myNick =
+        (widget.myProfile['nickname'] as String? ?? '').toLowerCase();
+    final body = (row['body'] as String? ?? '').toLowerCase();
+    final mentionsMe = whisper ||
+        (myNick.isNotEmpty && body.contains('@$myNick'));
+    if (mentionsMe) {
+      if (_soundOn) playSound('mention');
+      if (_vibrateOn) buzz();
+      return;
+    }
+    if (!_soundOn) return;
+    final now = DateTime.now();
+    if (now.difference(_lastReceiveSound) <
+        const Duration(milliseconds: 2500)) {
+      return;
+    }
+    _lastReceiveSound = now;
+    playSound('receive');
+  }
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    setWakelock(true); // Punto 6: pantalla encendida en el chat.
     _profiles[widget.myProfile['uid'] as String] = widget.myProfile;
     _input.addListener(_updateMentionHints);
     _init();
@@ -239,6 +290,10 @@ class _ChatPageState extends State<ChatPage> {
       final id = row['id'];
       if (id is int && _knownWhisperIds.contains(id)) return;
       if (_isBlocked(row)) return;
+      if (row['target_uid'] == _svc.myUid &&
+          row['sender_uid'] != _svc.myUid) {
+        _soundForIncoming(row, whisper: true);
+      }
       for (final uid in [row['sender_uid'], row['target_uid']]) {
         if (uid is String && !_profiles.containsKey(uid)) {
           final p = await _svc.profileByUid(uid);
@@ -271,6 +326,9 @@ class _ChatPageState extends State<ChatPage> {
       final id = row['id'];
       if (id is int && _knownIds.contains(id)) return; // ya lo mostré (eco)
       if (_isBlocked(row)) return;
+      if (row['sender_uid'] != _svc.myUid && row['kind'] == 'text') {
+        _soundForIncoming(row);
+      }
       final sender = row['sender_uid'] as String?;
       if (sender != null && !_profiles.containsKey(sender)) {
         final p = await _svc.profileByUid(sender);
@@ -339,6 +397,8 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    setWakelock(false);
     // Punto 12: aviso «se desconectó» (mejor esfuerzo al salir).
     if (_myMember?['banned_at'] == null) {
       _svc.sendSystemNotice(_roomId, 'leave');
@@ -389,6 +449,17 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Future<void> _startDm(Map<String, dynamic> profile) async {
+    // Punto 11: si la persona cerró sus privados (y no soy su
+    // favorito), se avisa aquí en vez de abrir un chat condenado.
+    final allowed = await _svc.canDm(profile['uid'] as String);
+    if (!allowed) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(t('chat.dmClosed'))),
+        );
+      }
+      return;
+    }
     final conv = await _svc.getOrCreateConversation(profile['uid'] as String);
     if (!mounted) return;
     await Navigator.of(context).push(
@@ -445,7 +516,10 @@ class _ChatPageState extends State<ChatPage> {
       if (!mounted) return;
       setState(() => _messages.remove(temp));
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(t('chat.whisperFailed', {'e': '$e'}))),
+        SnackBar(
+            content: Text('$e'.contains('whispers_closed')
+                ? t('chat.whisperClosed')
+                : t('chat.whisperFailed', {'e': '$e'}))),
       );
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -483,6 +557,7 @@ class _ChatPageState extends State<ChatPage> {
         blockedUids: _blocked,
         senderNickname: widget.myProfile['nickname'] as String,
       );
+      if (_soundOn) playSound('send');
       final realId = inserted['id'];
       if (realId is int) _knownIds.add(realId);
       if (!mounted) return;
@@ -523,13 +598,35 @@ class _ChatPageState extends State<ChatPage> {
       context: context,
       showDragHandle: true,
       builder: (_) => SafeArea(
-        child: ListTile(
-          leading: const Icon(Icons.translate),
-          title: Text(has ? t('chat.showOriginal') : t('chat.translate')),
-          onTap: () => Navigator.pop(context, 'go'),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.content_copy),
+              title: Text(t('chat.copy')),
+              onTap: () => Navigator.pop(context, 'copy'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.translate),
+              title:
+                  Text(has ? t('chat.showOriginal') : t('chat.translate')),
+              onTap: () => Navigator.pop(context, 'go'),
+            ),
+          ],
         ),
       ),
     );
+    if (action == 'copy') {
+      // Punto 15: copiar el mensaje al portapapeles.
+      await fservices.Clipboard.setData(
+          fservices.ClipboardData(text: body));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(t('chat.copied'))),
+        );
+      }
+      return;
+    }
     if (action != 'go' || !mounted) return;
     if (has) {
       setState(() => _translations.remove(key));
@@ -925,7 +1022,10 @@ class _ChatPageState extends State<ChatPage> {
                                 'm${m['id']}', m['body'] as String),
                             child: Padding(
                               padding: const EdgeInsets.symmetric(vertical: 4),
-                              child: RichText(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  RichText(
                                 text: TextSpan(
                                   style: DefaultTextStyle.of(context).style,
                                   children: [
@@ -985,6 +1085,20 @@ class _ChatPageState extends State<ChatPage> {
                                       ),
                                   ],
                                 ),
+                              ),
+                                  // Punto 8: tarjeta de YouTube bajo
+                                  // el mensaje, si trae un video.
+                                  if (youtubeIdFromText(
+                                          m['body'] as String) !=
+                                      null)
+                                    ConstrainedBox(
+                                      constraints: const BoxConstraints(
+                                          maxWidth: 340),
+                                      child: YoutubeCard(
+                                          videoId: youtubeIdFromText(
+                                              m['body'] as String)!),
+                                    ),
+                                ],
                               ),
                             ),
                           );

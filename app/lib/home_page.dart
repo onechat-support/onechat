@@ -705,16 +705,21 @@ class _ProfileTabState extends State<_ProfileTab> {
     if (fresh != null && mounted) widget.onProfileChanged(fresh);
   }
 
-  /// Ajustes de privacidad y contacto (puntos 11, 12 y 14).
+  /// Ajustes de privacidad y contacto (puntos 11, 12 y 14) y de
+  /// sonidos (punto 16).
   Future<void> _savePrivacy({
     bool? dmOpen,
     bool? whispersOpen,
     bool? showSystemNotices,
+    bool? soundEnabled,
+    bool? vibrateEnabled,
   }) async {
     await _svc.updateMyProfile(
       dmOpen: dmOpen,
       whispersOpen: whispersOpen,
       showSystemNotices: showSystemNotices,
+      soundEnabled: soundEnabled,
+      vibrateEnabled: vibrateEnabled,
     );
     final fresh = await _svc.fetchMyProfile();
     if (fresh != null && mounted) widget.onProfileChanged(fresh);
@@ -1070,6 +1075,20 @@ class _ProfileTabState extends State<_ProfileTab> {
           subtitle: Text(t('profile.systemNoticesHint')),
           value: p['show_system_notices'] != false,
           onChanged: (v) => _savePrivacy(showSystemNotices: v),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(t('profile.sound')),
+          subtitle: Text(t('profile.soundHint')),
+          value: p['sound_enabled'] != false,
+          onChanged: (v) => _savePrivacy(soundEnabled: v),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(t('profile.vibrate')),
+          subtitle: Text(t('profile.vibrateHint')),
+          value: p['vibrate_enabled'] != false,
+          onChanged: (v) => _savePrivacy(vibrateEnabled: v),
         ),
         const SizedBox(height: 8),
         OutlinedButton.icon(
