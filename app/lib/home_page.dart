@@ -464,6 +464,9 @@ class _StatusTabState extends State<_StatusTab> {
         return from != null
             ? t('status.gameInviteFrom', {'from': from})
             : t('status.gameInvite');
+      case 'cine_invite':
+        return t('status.cineInvite',
+            {'nick': p['from_nickname'] as String? ?? from ?? '···'});
       case 'safety':
         // Aviso del Bot de Seguridad (solo Staff/dueño lo reciben).
         final level = '${p['level'] ?? ''}';
@@ -489,6 +492,8 @@ class _StatusTabState extends State<_StatusTab> {
         return Icons.chat_bubble_outline;
       case 'game_invite':
         return Icons.sports_esports;
+      case 'cine_invite':
+        return Icons.movie_outlined;
       case 'safety':
         return Icons.shield_outlined;
       case 'moderation':
@@ -503,7 +508,7 @@ class _StatusTabState extends State<_StatusTab> {
   Future<void> _open(Map<String, dynamic> n) async {
     final p = (n['payload'] as Map?) ?? const {};
     final kind = n['kind'] as String?;
-    if (kind == 'dm' || kind == 'game_invite') {
+    if (kind == 'dm' || kind == 'game_invite' || kind == 'cine_invite') {
       final fromUid = p['from_uid'] as String?;
       if (fromUid == null) return;
       final other = await _svc.profileByUid(fromUid);

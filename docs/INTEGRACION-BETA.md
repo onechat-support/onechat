@@ -77,7 +77,37 @@ de usuario y de abuso avisan al dueño). Datos de prueba purgados
 - **Punto 13 (app):** «Cambiar mi nickname» en el Perfil, con los
   mensajes del servidor (ocupado, inválido, enfriamiento).
 
-## Lotes C y D — pendientes (ver CAMBIOS-POST-ALFA.md)
+## Lote C — Mensajes y multimedia (v2026.11.26.2) · EN VIVO
 
-C: Copiar (15), YouTube en el chat (8), teclado (5), wakelock (6),
-sonidos y vibración (16). D: Cine juntos Premium (17).
+Verificado en vivo 2026-11-26: MD5 d62a8ccfefac248dc20e6038e58a2648
+en /chat/ y /onechat/, versión 2026.11.26.2 presente y los tres
+archivos de sonido responden HTTP 200 en ambas rutas.
+
+- **Punto 15 — Copiar:** el menú de toque largo (salas, susurros y
+  privados) suma «Copiar» junto a «Traducir»; aviso «Mensaje
+  copiado».
+- **Punto 8 — YouTube en el chat:** si un mensaje trae un enlace de
+  YouTube, bajo el texto aparece la tarjeta con la miniatura; al
+  tocarla se despliega el reproductor oficial (youtube-nocookie)
+  dentro de la app, sin autoplay. Toque largo en la tarjeta abre el
+  video en YouTube. En salas y en privados.
+- **Punto 5 — Teclado:** al abrirse el teclado, la conversación
+  sube sola hasta el último mensaje (observador de métricas en
+  salas y privados).
+- **Punto 6 — Pantalla encendida:** WakeLock API del navegador
+  mientras una sala o un privado está abierto; se libera al salir.
+  Si el navegador no lo soporta, no hace nada.
+- **Punto 16 — Sonidos y vibración:** tres sonidos cortos propios
+  (enviar, recibir con freno de 2,5 s, mención en dos tonos) y
+  vibración al ser mencionado o recibir un susurro, todo con los
+  interruptores `sound_enabled` / `vibrate_enabled` del Perfil
+  (sección «Privacidad y contacto»). En web iOS la vibración es
+  limitada (límite conocido y avisado en el propio ajuste).
+- **De paso (Lote A en la app):** al intentar abrir un privado de
+  alguien que los cerró, avisa «tiene los mensajes privados
+  cerrados» sin abrir el chat; el error `dm_closed` y el
+  `whispers_closed` ya se muestran con su texto amable.
+
+## Lote D — pendiente (ver CAMBIOS-POST-ALFA.md)
+
+D: Cine juntos Premium (17).

@@ -1133,6 +1133,81 @@ class OnechatService {
     return channel;
   }
 
+  // ---------- Cine juntos Premium (punto 17, migración v1.24) ----------
+
+  /// Invita a ver un video juntos. Devuelve el id de la sesión, o
+  /// null si el servidor lo rechazó (p. ej. quien invita no es
+  /// Premium ni del equipo).
+  Future<String?> inviteCine(
+      String conversationId, String otherUid, String videoId) async {
+    final r = await _db.rpc('cine_invite', params: {
+      'p_conversation': conversationId,
+      'p_other': otherUid,
+      'p_video_id': videoId,
+    });
+    return r as String?;
+  }
+
+  Future<bool> respondCine(String sessionId, bool accept) async {
+    final r = await _db.rpc('cine_respond',
+        params: {'p_session': sessionId, 'p_accept': accept});
+    return r == true;
+  }
+
+  Future<bool> controlCine(
+      String sessionId, String playState, double positionSec) async {
+    final r = await _db.rpc('cine_control', params: {
+      'p_session': sessionId,
+      'p_play_state': playState,
+      'p_position': positionSec,
+    });
+    return r == true;
+  }
+
+  Future<bool> endCine(String sessionId) async {
+    final r = await _db.rpc('cine_end', params: {'p_session': sessionId});
+    return r == true;
+  }
+
+  /// La sesión de cine viva (invitada o activa) de esta
+  /// conversación, si la hay.
+  Future<Map<String, dynamic>?> fetchConversationCine(
+      String conversationId) async {
+    final rows = await _db
+        .from('cine_sessions')
+        .select()
+        .eq('conversation_id', conversationId)
+        .inFilter('status', ['invited', 'active'])
+        .order('created_at', ascending: false)
+        .limit(1);
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  Future<Map<String, dynamic>?> fetchCineById(String sessionId) async {
+    final rows =
+        await _db.from('cine_sessions').select().eq('id', sessionId).limit(1);
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  RealtimeChannel subscribeCine(
+      String sessionId, void Function(Map<String, dynamic> row) onUpdate) {
+    final channel = _db.channel('cine-$sessionId');
+    channel
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'cine_sessions',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'id',
+            value: sessionId,
+          ),
+          callback: (payload) => onUpdate(payload.newRecord),
+        )
+        .subscribe();
+    return channel;
+  }
+
   // ---------- Ayuda / Staff (pulido tras Etapa 5) ----------
 
   /// Uids del equipo: dueño global y staff.

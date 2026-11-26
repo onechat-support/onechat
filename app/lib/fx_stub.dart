@@ -10,3 +10,9 @@ void setWakelock(bool on) {}
 /// Sin navegador no hay reproductor incrustado: se muestra un
 /// aviso simple (la tarjeta ya ofrece abrir el video fuera).
 Widget youtubePlayer(String videoId) => const SizedBox.shrink();
+
+/// Reproductor de «Cine juntos» fuera de web: sin efecto.
+Widget cinePlayer(String key, String videoId) => const SizedBox.shrink();
+
+/// Comando al reproductor de cine fuera de web: sin efecto.
+void cineCommand(String key, String func, [double? arg]) {}

@@ -78,3 +78,46 @@ Widget youtubePlayer(String videoId) {
     child: HtmlElementView(viewType: viewType),
   );
 }
+
+final Map<String, html.IFrameElement> _cineFrames = {};
+int _cineCounter = 0;
+
+/// Reproductor de «Cine juntos»: iframe oficial con la API
+/// activada (enablejsapi) y sin controles propios, porque los
+/// controles son los de la app y mandan sobre los dos lados a la
+/// vez a través del estado compartido en el servidor.
+Widget cinePlayer(String key, String videoId) {
+  final viewType = 'onechat-cine-$key-${_cineCounter++}';
+  ui_web.platformViewRegistry.registerViewFactory(viewType, (int _) {
+    final iframe = html.IFrameElement()
+      ..src =
+          'https://www.youtube-nocookie.com/embed/$videoId?enablejsapi=1&controls=0&rel=0&playsinline=1'
+      ..style.border = 'none'
+      ..style.width = '100%'
+      ..style.height = '100%'
+      ..allow = 'encrypted-media; picture-in-picture'
+      ..allowFullscreen = true;
+    _cineFrames[key] = iframe;
+    return iframe;
+  });
+  return AspectRatio(
+    aspectRatio: 16 / 9,
+    child: HtmlElementView(viewType: viewType),
+  );
+}
+
+/// Envía un comando al reproductor de cine (playVideo, pauseVideo
+/// o seekTo con la posición en segundos) por postMessage, el
+/// mecanismo oficial de la API de iframe de YouTube.
+void cineCommand(String key, String func, [double? arg]) {
+  final frame = _cineFrames[key];
+  final win = frame?.contentWindow;
+  if (frame == null || win == null) return;
+  final String message;
+  if (func == 'seekTo' && arg != null) {
+    message = '{"event":"command","func":"seekTo","args":[$arg,true]}';
+  } else {
+    message = '{"event":"command","func":"$func","args":""}';
+  }
+  win.postMessage(message, '*');
+}

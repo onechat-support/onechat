@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart' as fservices;
 import 'package:material_ui/material_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -198,6 +200,12 @@ class _DmChatPageState extends State<DmChatPage>
   bool _gameBusy = false;
   final Set<String> _dismissedGames = {};
 
+  // Cine juntos Premium (punto 17, migración v1.24)
+  Map<String, dynamic>? _cine;
+  RealtimeChannel? _cineChannel;
+  bool _cineBusy = false;
+  Timer? _cineTicker;
+
   String get _otherUid => widget.other['uid'] as String;
 
   // Lote C: teclado (punto 5) y sonidos (punto 16), como en salas.
@@ -238,8 +246,10 @@ class _DmChatPageState extends State<DmChatPage>
     });
     _jumpToBottom();
     _loadGame();
+    _loadCine();
     _channel = _svc.subscribeDirectMessages(widget.conversationId, (row) {
       _loadGame();
+      _loadCine();
       final id = row['id'];
       if (id is int && _knownIds.contains(id)) return;
       if (!mounted) return;
@@ -338,6 +348,9 @@ class _DmChatPageState extends State<DmChatPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     setWakelock(false);
+    _cineTicker?.cancel();
+    final cc = _cineChannel;
+    if (cc != null) _svc.unsubscribe(cc);
     final ch = _channel;
     if (ch != null) _svc.unsubscribe(ch);
     final gch = _gameChannel;
@@ -479,6 +492,323 @@ class _DmChatPageState extends State<DmChatPage>
     if (id == null) return;
     await _svc.resignGame(id);
     await _refreshGame();
+  }
+
+  // ---------- Cine juntos Premium (punto 17) ----------
+
+  /// Posición actual del video según el estado compartido:
+  /// la posición guardada más lo transcurrido si está sonando.
+  double _cinePosition() {
+    final c = _cine;
+    if (c == null) return 0;
+    final base = (c['position_sec'] as num?)?.toDouble() ?? 0;
+    if (c['play_state'] != 'playing') return base;
+    final upd = DateTime.tryParse(c['updated_at'] as String? ?? '');
+    if (upd == null) return base;
+    final elapsed =
+        DateTime.now().toUtc().difference(upd).inMilliseconds / 1000.0;
+    return base + (elapsed > 0 ? elapsed : 0);
+  }
+
+  String _cineClock() {
+    final s = _cinePosition().floor();
+    final mm = (s ~/ 60).toString().padLeft(2, '0');
+    final ss = (s % 60).toString().padLeft(2, '0');
+    return '$mm:$ss';
+  }
+
+  void _setCine(Map<String, dynamic>? session) {
+    _cineTicker?.cancel();
+    _cineTicker = null;
+    setState(() => _cine = session);
+    if (session != null && session['status'] == 'active') {
+      // Reloj de la posición mientras suena (solo redibuja).
+      _cineTicker = Timer.periodic(const Duration(seconds: 1), (_) {
+        if (mounted && _cine?['play_state'] == 'playing') {
+          setState(() {});
+        }
+      });
+    }
+  }
+
+  Future<void> _loadCine() async {
+    final s = await _svc.fetchConversationCine(widget.conversationId);
+    if (!mounted) return;
+    if (s == null) {
+      if (_cine != null) _setCine(null);
+      return;
+    }
+    _setCine(s);
+    _subscribeCine(s['id'] as String);
+  }
+
+  void _subscribeCine(String sessionId) {
+    if (_cineChannel != null) return;
+    _cineChannel = _svc.subscribeCine(sessionId, (row) {
+      if (!mounted) return;
+      final status = row['status'] as String?;
+      if (status == 'ended' || status == 'declined') {
+        final ch = _cineChannel;
+        _cineChannel = null;
+        if (ch != null) _svc.unsubscribe(ch);
+        _setCine(null);
+        return;
+      }
+      final wasActive = _cine?['status'] == 'active';
+      _setCine({...?_cine, ...row});
+      // Si el cambio lo hizo la otra persona, mi reproductor
+      // obedece: salta a la posición compartida y suena o pausa.
+      if (row['updated_by'] != _svc.myUid &&
+          (status == 'active' || wasActive)) {
+        final target = _cinePosition();
+        cineCommand(sessionId, 'seekTo', target);
+        cineCommand(sessionId,
+            row['play_state'] == 'playing' ? 'playVideo' : 'pauseVideo');
+      }
+    });
+  }
+
+  Future<void> _inviteCine() async {
+    final me = widget.myProfile;
+    final canHost = me['is_premium'] == true ||
+        me['global_role'] == 'owner' ||
+        me['global_role'] == 'staff';
+    if (!canHost) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(t('cine.premiumOnly'))),
+      );
+      return;
+    }
+    final ctrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t('cine.inviteTitle')),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          decoration: InputDecoration(hintText: t('cine.linkHint')),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(t('cine.cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(t('cine.sendInvite')),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    final videoId = youtubeIdFromText(ctrl.text.trim());
+    if (videoId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(t('cine.invalidLink'))),
+      );
+      return;
+    }
+    setState(() => _cineBusy = true);
+    try {
+      final id =
+          await _svc.inviteCine(widget.conversationId, _otherUid, videoId);
+      if (!mounted) return;
+      if (id == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(t('cine.inviteFailed'))),
+        );
+        return;
+      }
+      final s = await _svc.fetchCineById(id);
+      if (mounted && s != null) {
+        _setCine(s);
+        _subscribeCine(id);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(t('cine.inviteSent'))),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _cineBusy = false);
+    }
+  }
+
+  Future<void> _respondCine(bool accept) async {
+    final id = _cine?['id'] as String?;
+    if (id == null) return;
+    setState(() => _cineBusy = true);
+    try {
+      await _svc.respondCine(id, accept);
+      final s = await _svc.fetchCineById(id);
+      if (!mounted) return;
+      if (s == null ||
+          s['status'] == 'declined' ||
+          s['status'] == 'ended') {
+        _setCine(null);
+      } else {
+        _setCine(s);
+      }
+    } finally {
+      if (mounted) setState(() => _cineBusy = false);
+    }
+  }
+
+  Future<void> _endCine() async {
+    final id = _cine?['id'] as String?;
+    if (id == null) return;
+    await _svc.endCine(id);
+    if (mounted) _setCine(null);
+  }
+
+  Future<void> _cineTogglePlay() async {
+    final c = _cine;
+    if (c == null || _cineBusy) return;
+    final id = c['id'] as String;
+    final playing = c['play_state'] == 'playing';
+    final pos = _cinePosition();
+    // Mi reproductor responde al instante; el estado compartido
+    // lleva el cambio al otro lado.
+    if (playing) {
+      cineCommand(id, 'pauseVideo');
+    } else {
+      cineCommand(id, 'seekTo', pos);
+      cineCommand(id, 'playVideo');
+    }
+    setState(() => _cineBusy = true);
+    try {
+      await _svc.controlCine(id, playing ? 'paused' : 'playing', pos);
+    } finally {
+      if (mounted) setState(() => _cineBusy = false);
+    }
+  }
+
+  Future<void> _cineSeek(double delta) async {
+    final c = _cine;
+    if (c == null || _cineBusy) return;
+    final id = c['id'] as String;
+    var pos = _cinePosition() + delta;
+    if (pos < 0) pos = 0;
+    cineCommand(id, 'seekTo', pos);
+    setState(() => _cineBusy = true);
+    try {
+      await _svc.controlCine(
+          id, c['play_state'] as String? ?? 'paused', pos);
+    } finally {
+      if (mounted) setState(() => _cineBusy = false);
+    }
+  }
+
+  Widget _cineArea() {
+    final otherNick = widget.other['nickname'] as String;
+    final c = _cine;
+    if (c == null) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            onPressed: _cineBusy ? null : _inviteCine,
+            icon: const Icon(Icons.movie_outlined, size: 18),
+            label: Text(t('cine.button')),
+          ),
+        ),
+      );
+    }
+    final me = _svc.myUid;
+    final iAmHost = c['host_uid'] == me;
+    final status = c['status'] as String;
+    final videoId = c['video_id'] as String;
+    if (status == 'invited') {
+      final header = Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.network(
+              'https://i.ytimg.com/vi/$videoId/hqdefault.jpg',
+              height: 90,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const SizedBox(height: 90),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            iAmHost
+                ? t('cine.waiting', {'nick': otherNick})
+                : t('cine.invitedBy', {'nick': otherNick}),
+            style: const TextStyle(fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      );
+      final actions = iAmHost
+          ? [
+              _gameButton(
+                  t('cine.cancel'), _cineBusy ? null : () => _respondCine(false)),
+            ]
+          : [
+              _gameButton(
+                  t('cine.accept'), _cineBusy ? null : () => _respondCine(true),
+                  primary: true),
+              const SizedBox(width: 8),
+              _gameButton(t('cine.decline'),
+                  _cineBusy ? null : () => _respondCine(false)),
+            ];
+      return _gameCard(header, actions, null);
+    }
+    // Activa: reproductor + controles compartidos.
+    final playing = c['play_state'] == 'playing';
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.movie, size: 18),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(t('cine.watchingWith', {'nick': otherNick}),
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+              ),
+              TextButton(
+                onPressed: _endCine,
+                child: Text(t('cine.end')),
+              ),
+            ],
+          ),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: cinePlayer(c['id'] as String, videoId),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              IconButton(
+                onPressed: _cineBusy ? null : () => _cineSeek(-10),
+                icon: const Icon(Icons.replay_10),
+              ),
+              IconButton.filled(
+                onPressed: _cineBusy ? null : _cineTogglePlay,
+                icon: Icon(playing ? Icons.pause : Icons.play_arrow),
+              ),
+              IconButton(
+                onPressed: _cineBusy ? null : () => _cineSeek(10),
+                icon: const Icon(Icons.forward_10),
+              ),
+              const SizedBox(width: 8),
+              Text(_cineClock()),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _gameArea() {
@@ -746,6 +1076,7 @@ class _DmChatPageState extends State<DmChatPage>
                       ),
           ),
           _gameArea(),
+          _cineArea(),
           SafeArea(
             top: false,
             child: Padding(
