@@ -110,16 +110,22 @@ class _SessionGateState extends State<SessionGate> {
         }
         final profile = snap.data;
         if (profile == null) {
-          // Sesión anónima sin perfil = sesión huérfana (p. ej. se
-          // cerró la pestaña a mitad de la entrada como invitado).
-          // No hay cuenta que completar: se cierra sola y la puerta
-          // vuelve a ser el acceso bueno, siempre. La pantalla de
-          // nickname queda solo para cuentas de correo reales.
+          // Sin perfil. La pantalla de nickname SOLO tiene sentido
+          // para un registro con correo recién confirmado cuyo
+          // nickname sigue libre; todo lo demás es una sesión
+          // huérfana o duplicada (invitado a mitad de entrada, una
+          // segunda cuenta sin terminar, el dueño real entrando
+          // por otra vía) y debe volver al acceso bueno, siempre.
+          if (snap.hasError) return const NicknameSetupPage();
           final user = svc.currentUser;
-          if (!snap.hasError && user != null && user.isAnonymous) {
+          if (user == null || user.isAnonymous) {
             return const _ResetToWelcome();
           }
-          return const NicknameSetupPage();
+          final metaNick = user.userMetadata?['nickname'] as String?;
+          if (metaNick == null || metaNick.isEmpty) {
+            return const _ResetToWelcome();
+          }
+          return _NicknameCompletionGate(nickname: metaNick);
         }
         // Puerta de entrada: registra la conexión y aplica
         // el Destierro (cuenta + dispositivo + IP) antes de
@@ -181,6 +187,36 @@ class _ResetToWelcomeState extends State<_ResetToWelcome> {
     if (_done) return const WelcomePage();
     return const Scaffold(
       body: Center(child: CircularProgressIndicator()),
+    );
+  }
+}
+
+/// Decide si una sesión de correo sin perfil es un registro
+/// legítimo por completar (su nickname sigue libre → pantalla de
+/// nickname) o una sesión duplicada/huérfana (su nickname ya lo
+/// tiene otra cuenta → volver al acceso bueno). Sin esta salida,
+/// el dueño real de un nickname quedaba atrapado viendo
+/// «ese nickname ya está en uso» en cada visita (Mario, 2026-11-26).
+class _NicknameCompletionGate extends StatelessWidget {
+  const _NicknameCompletionGate({required this.nickname});
+
+  final String nickname;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<String>(
+      future: OnechatService().nicknameStatus(nickname),
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (snap.hasError || snap.data == 'free') {
+          return const NicknameSetupPage();
+        }
+        return const _ResetToWelcome();
+      },
     );
   }
 }
