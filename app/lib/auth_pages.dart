@@ -5,6 +5,7 @@ import 'home_page.dart';
 import 'services.dart';
 import 'strings.dart';
 import 'theme.dart';
+import 'welcome_page.dart';
 
 String _clean(Object e) => e.toString().replaceFirst('Exception: ', '');
 
@@ -317,6 +318,19 @@ class _NicknameSetupPageState extends State<NicknameSetupPage> {
     super.dispose();
   }
 
+  /// Salida de emergencia: quien llegó aquí con una sesión sin
+  /// perfil pero YA tiene una cuenta (su nickname «está en uso»
+  /// porque es suyo) puede cerrar esta sesión y volver a la
+  /// pantalla de acceso para entrar con su cuenta de siempre.
+  Future<void> _exitToSignIn() async {
+    await _svc.signOut();
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const WelcomePage()),
+      (_) => false,
+    );
+  }
+
   Future<void> _submit() async {
     final nick = _nick.text.trim();
     final invalid = OnechatService.validateNickname(nick);
@@ -383,6 +397,11 @@ class _NicknameSetupPageState extends State<NicknameSetupPage> {
                         textAlign: TextAlign.center,
                         style: const TextStyle(color: OneChatColors.mention)),
                   ],
+                  const SizedBox(height: 10),
+                  TextButton(
+                    onPressed: _busy ? null : _exitToSignIn,
+                    child: Text(t('auth.useExistingAccount')),
+                  ),
                 ],
               ),
             ),

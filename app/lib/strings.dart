@@ -60,6 +60,7 @@ const _es = {
   'auth.create': 'CREAR CUENTA',
   'auth.creating': 'Creando…',
   'auth.nicknameTaken': 'Ese nickname ya está en uso. Prueba con otro.',
+  'auth.useExistingAccount': '¿Ya tienes una cuenta? Salir y entrar con ella',
   'auth.newPasswordTitle': 'Nueva contraseña',
   'auth.newPasswordBody':
       'Escribe tu contraseña nueva. La vas a usar junto con tu nickname para entrar.',
@@ -441,6 +442,7 @@ const _en = {
   'auth.create': 'CREATE ACCOUNT',
   'auth.creating': 'Creating…',
   'auth.nicknameTaken': 'That nickname is already taken. Try another one.',
+  'auth.useExistingAccount': 'Already have an account? Sign out and sign in with it',
   'auth.newPasswordTitle': 'New password',
   'auth.newPasswordBody':
       'Type your new password. You will use it together with your nickname to sign in.',
