@@ -1,7 +1,14 @@
-# Bot de Seguridad Infantil — Fase B1 en vivo (2026-11-25)
+# Bot de Seguridad Infantil «Centinel» — Fase B1 en vivo (2026-11-25)
 
 Migración **v1.18** aplicada en Supabase y app **v2026.11.25.5**.
 Diseño y decisiones: `PLAN-BOT-SEGURIDAD-INFANTIL.md` (v1.0 validada).
+
+El propietario bautizó al bot **Centinel** el 2026-11-25 para darle
+identidad propia (será el corazón de su futura app de seguridad
+infantil). La portada web muestra su recuadro con el contador público
+de «amenazas mitigadas» (migración **v1.19**: la función
+`centinel_mitigated_count()` expone solo el conteo agregado de
+intervenciones de Nivel 3, sin ningún dato de las tablas internas).
 
 ## Qué quedó activo
 

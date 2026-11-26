@@ -36,6 +36,17 @@ String friendlyAuthError(Object e) {
   return t('auth.errGeneric');
 }
 
+/// Columnas legibles de un perfil: todas menos `email`. Desde la
+/// auditoría de seguridad del 2026-11-25 (migración v1.20) la API
+/// no concede lectura de la columna email a nadie; pedir el perfil
+/// con * falla entero, así que las lecturas de perfil usan esta
+/// lista explícita.
+const profileColumns =
+    'uid,nickname,nickname_lower,nickname_color,bio,photo_url,'
+    'is_guest,global_role,language,country,gender,birth_year,'
+    'theme_mode,profile_views,created_at,last_seen_at,'
+    'show_in_directory,is_premium,conduct_accepted_at';
+
 /// Capa de acceso a Supabase para ONEchat (Etapa 1, MVP).
 /// Toda la seguridad real la impone la base de datos con RLS;
 /// esta clase solo orquesta llamadas.
@@ -199,8 +210,11 @@ class OnechatService {
   Future<Map<String, dynamic>?> fetchMyProfile() async {
     final uid = myUid;
     if (uid == null) return null;
-    final rows =
-        await _db.from('profiles').select().eq('uid', uid).limit(1);
+    final rows = await _db
+        .from('profiles')
+        .select(profileColumns)
+        .eq('uid', uid)
+        .limit(1);
     if (rows.isEmpty) return null;
     return rows.first;
   }
@@ -471,13 +485,18 @@ class OnechatService {
   }
 
   Future<Map<String, dynamic>?> profileByUid(String uid) async {
-    final rows = await _db.from('profiles').select().eq('uid', uid).limit(1);
+    final rows = await _db
+        .from('profiles')
+        .select(profileColumns)
+        .eq('uid', uid)
+        .limit(1);
     return rows.isEmpty ? null : rows.first;
   }
 
   Future<List<Map<String, dynamic>>> profilesByUids(List<String> uids) async {
     if (uids.isEmpty) return [];
-    final rows = await _db.from('profiles').select().inFilter('uid', uids);
+    final rows =
+        await _db.from('profiles').select(profileColumns).inFilter('uid', uids);
     return List<Map<String, dynamic>>.from(rows);
   }
 

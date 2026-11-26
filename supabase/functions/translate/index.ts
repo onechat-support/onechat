@@ -5,6 +5,12 @@
 // La interfaz con la app no cambia: entra {text, target} y sale
 // {translated, detected}. Como la llama el navegador, maneja CORS
 // en todas las respuestas (lección de la Etapa 1).
+//
+// Seguridad (auditoría 2026-11-25): exige una sesión válida
+// (registrado o invitado). Sin esto, cualquiera con la clave
+// pública podía quemar la cuota diaria de MyMemory y dejar sin
+// traducción a los usuarios reales.
+import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -49,6 +55,17 @@ function detect(text: string): string | null {
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
+  }
+  const authHeader = req.headers.get("Authorization") ?? "";
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL") ?? "",
+    Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+    { global: { headers: { Authorization: authHeader } } },
+  );
+  const { data: userData, error: userError } = await supabase.auth
+    .getUser();
+  if (userError || !userData.user) {
+    return json({ error: "unauthorized" }, 401);
   }
   try {
     const { text, target } = await req.json();

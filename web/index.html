@@ -161,6 +161,25 @@
     </script>
   </section>
 
+  <!-- CENTINEL -->
+  <section class="block">
+    <div class="centinel-box">
+      <img class="centinel-img" src="assets/centinel.png" alt="Emblema de Centinel" width="940" height="1039">
+      <div class="centinel-body">
+        <div class="centinel-name">CENTINEL <span>· el guardián de ONEchat</span></div>
+        <p class="centinel-text">Nuestro sistema de seguridad vigila las conversaciones
+           de riesgo las 24 horas y actúa en segundos, incluso cuando no hay
+           nadie del equipo conectado.</p>
+      </div>
+      <div class="centinel-count">
+        <div class="centinel-num" id="centinelCount">…</div>
+        <div class="centinel-label">amenazas mitigadas</div>
+      </div>
+    </div>
+    <p class="centinel-note">Intervenciones críticas de Centinel: conversaciones de riesgo
+       congeladas al instante o alertadas con máxima prioridad al equipo de seguridad.</p>
+  </section>
+
   <!-- PREMIUM -->
   <section class="block">
     <div class="premium-band">
@@ -223,6 +242,13 @@ await ensureSession();
     .select("uid", { count: "exact", head: true })
     .gte("last_seen_at", since);
   document.getElementById("onlineCount").textContent = count ?? 0;
+}
+
+// Centinel: amenazas mitigadas (solo el número agregado, sin datos).
+{
+  const { data } = await db.rpc("centinel_mitigated_count");
+  const el = document.getElementById("centinelCount");
+  if (el && typeof data === "number") el.textContent = data;
 }
 
 // Salas: chips que enlazan al chat.

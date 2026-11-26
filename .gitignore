@@ -8,3 +8,7 @@ app/.dart_tool/
 app/.packages
 app/.flutter-plugins*
 app/ios/Pods/
+
+# Sesión del equipo alfa (no versionar)
+.alpha/session.json
+.alpha/state.json
