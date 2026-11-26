@@ -374,6 +374,17 @@ class _NicknameSetupPageState extends State<NicknameSetupPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // El mismo logo del acceso bueno: esta pantalla
+                  // también es una puerta de entrada (2026-11-26).
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: Image.asset(
+                      'assets/logo_onechat.png',
+                      fit: BoxFit.fitWidth,
+                      semanticLabel: 'ONEchat',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   Text(
                     t('auth.nicknameIntro'),
                     textAlign: TextAlign.center,

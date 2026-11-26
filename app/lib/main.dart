@@ -109,7 +109,18 @@ class _SessionGateState extends State<SessionGate> {
           );
         }
         final profile = snap.data;
-        if (profile == null) return const NicknameSetupPage();
+        if (profile == null) {
+          // Sesión anónima sin perfil = sesión huérfana (p. ej. se
+          // cerró la pestaña a mitad de la entrada como invitado).
+          // No hay cuenta que completar: se cierra sola y la puerta
+          // vuelve a ser el acceso bueno, siempre. La pantalla de
+          // nickname queda solo para cuentas de correo reales.
+          final user = svc.currentUser;
+          if (!snap.hasError && user != null && user.isAnonymous) {
+            return const _ResetToWelcome();
+          }
+          return const NicknameSetupPage();
+        }
         // Puerta de entrada: registra la conexión y aplica
         // el Destierro (cuenta + dispositivo + IP) antes de
         // mostrar el interior de la app.
@@ -134,6 +145,42 @@ class _SessionGateState extends State<SessionGate> {
           },
         );
       },
+    );
+  }
+}
+
+/// Cierra una sesión anónima huérfana (sin perfil) y muestra la
+/// pantalla de acceso. Así el login bueno es la puerta única:
+/// nadie queda atrapado en «Elige tu nickname» por la sesión
+/// vacía de una visita anterior (pedido de Mario, 2026-11-26).
+class _ResetToWelcome extends StatefulWidget {
+  const _ResetToWelcome();
+
+  @override
+  State<_ResetToWelcome> createState() => _ResetToWelcomeState();
+}
+
+class _ResetToWelcomeState extends State<_ResetToWelcome> {
+  bool _done = false;
+
+  @override
+  void initState() {
+    super.initState();
+    () async {
+      try {
+        await OnechatService().signOut();
+      } catch (_) {
+        // Aunque la red falle, mostramos el acceso igualmente.
+      }
+      if (mounted) setState(() => _done = true);
+    }();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_done) return const WelcomePage();
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
     );
   }
 }
