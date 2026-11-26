@@ -416,7 +416,50 @@ class _StatusTabState extends State<_StatusTab> {
       case 'favorite_out':
         return t('status.favoriteIn');
       case 'moderation':
-        return t('status.moderation');
+        // Avisos del equipo con alcance por rol (punto 10).
+        final action = p['action'] as String?;
+        final target = p['target_nickname'] as String? ?? '···';
+        final actor = p['actor_nickname'] as String? ?? '···';
+        final reporter = p['reporter_nickname'] as String? ?? '···';
+        switch (action) {
+          case 'auto_mute_link':
+            return t('status.modAutoMute', {
+              'target': target,
+              'room': room ?? '',
+              'minutes': '${p['minutes'] ?? ''}',
+              'n': '${p['infractions'] ?? ''}',
+            });
+          case 'report_user':
+            return t('status.modReportUser',
+                {'reporter': reporter, 'target': target});
+          case 'report_error':
+            return t('status.modReportError', {'reporter': reporter});
+          case 'report_abuse':
+            return t('status.modReportAbuse', {'target': target});
+          case 'mute':
+          case 'unmute':
+          case 'ban':
+          case 'unban':
+          case 'kick':
+          case 'feature':
+          case 'unfeature':
+            return t('status.modAction', {
+              'actor': actor,
+              'verb': t('mod.verb.$action'),
+              'target': target,
+              'room': room ?? '',
+            });
+          default:
+            return t('status.moderation');
+        }
+      case 'system':
+        if (p['code'] == 'link_blocked') {
+          return t('status.linkBlocked', {
+            'room': room ?? '',
+            'minutes': '${p['minutes'] ?? ''}',
+          });
+        }
+        return t('status.system');
       case 'game_invite':
         return from != null
             ? t('status.gameInviteFrom', {'from': from})
@@ -448,6 +491,8 @@ class _StatusTabState extends State<_StatusTab> {
         return Icons.sports_esports;
       case 'safety':
         return Icons.shield_outlined;
+      case 'moderation':
+        return Icons.gavel;
       default:
         return Icons.notifications_none;
     }
@@ -658,6 +703,76 @@ class _ProfileTabState extends State<_ProfileTab> {
     await _svc.updateMyProfile(country: country);
     final fresh = await _svc.fetchMyProfile();
     if (fresh != null && mounted) widget.onProfileChanged(fresh);
+  }
+
+  /// Ajustes de privacidad y contacto (puntos 11, 12 y 14).
+  Future<void> _savePrivacy({
+    bool? dmOpen,
+    bool? whispersOpen,
+    bool? showSystemNotices,
+  }) async {
+    await _svc.updateMyProfile(
+      dmOpen: dmOpen,
+      whispersOpen: whispersOpen,
+      showSystemNotices: showSystemNotices,
+    );
+    final fresh = await _svc.fetchMyProfile();
+    if (fresh != null && mounted) widget.onProfileChanged(fresh);
+  }
+
+  /// Cambio de nickname desde la app (punto 13): el servidor hace
+  /// el cambio atómico y aplica el freno de 7 días.
+  Future<void> _changeNickname() async {
+    final ctrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t('profile.nickTitle')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: ctrl,
+              autofocus: true,
+              maxLength: 20,
+              decoration:
+                  InputDecoration(labelText: t('profile.nickLabel')),
+            ),
+            const SizedBox(height: 6),
+            Text(t('profile.nickHint'),
+                style: const TextStyle(fontSize: 12.5)),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(t('welcome.cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(t('profile.changeNick')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final newNick = ctrl.text.trim();
+    final result = await _svc.changeNickname(newNick);
+    if (!mounted) return;
+    final msg = switch (result) {
+      'ok' => t('profile.nickOk', {'nick': newNick}),
+      'taken' => t('profile.nickTaken'),
+      'invalid' => t('profile.nickInvalid'),
+      'same' => t('profile.nickSame'),
+      'cooldown' => t('profile.nickCooldown'),
+      _ => t('profile.nickError'),
+    };
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
+    if (result == 'ok') {
+      final fresh = await _svc.fetchMyProfile();
+      if (fresh != null && mounted) widget.onProfileChanged(fresh);
+    }
   }
 
   @override
@@ -933,6 +1048,45 @@ class _ProfileTabState extends State<_ProfileTab> {
           onChanged: _saveCountry,
         ),
         const SizedBox(height: 26),
+        Text(t('profile.privacySection'),
+            style: const TextStyle(fontWeight: FontWeight.bold)),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(t('profile.dmOpen')),
+          subtitle: Text(t('profile.dmOpenHint')),
+          value: p['dm_open'] != false,
+          onChanged: (v) => _savePrivacy(dmOpen: v),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(t('profile.whispersOpen')),
+          subtitle: Text(t('profile.whispersOpenHint')),
+          value: p['whispers_open'] != false,
+          onChanged: (v) => _savePrivacy(whispersOpen: v),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(t('profile.systemNotices')),
+          subtitle: Text(t('profile.systemNoticesHint')),
+          value: p['show_system_notices'] != false,
+          onChanged: (v) => _savePrivacy(showSystemNotices: v),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: _changeNickname,
+          icon: const Icon(Icons.badge_outlined),
+          label: Text(t('profile.changeNick')),
+        ),
+        if (p['global_role'] == 'owner') ...[
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const _OwnerRolesPage())),
+            icon: const Icon(Icons.admin_panel_settings_outlined),
+            label: Text(t('owner.panelTitle')),
+          ),
+        ],
+        const SizedBox(height: 26),
         OutlinedButton.icon(
           onPressed: () => showReportSheet(context),
           icon: const Icon(Icons.flag_outlined),
@@ -1047,6 +1201,146 @@ class _ProfileTabState extends State<_ProfileTab> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Panel del dueño (punto 2): buscar usuarios y otorgar o quitar
+/// roles globales (usuario, moderador global, Staff). El servidor
+/// (set_global_role) protege al dueño y deja auditoría.
+class _OwnerRolesPage extends StatefulWidget {
+  const _OwnerRolesPage();
+
+  @override
+  State<_OwnerRolesPage> createState() => _OwnerRolesPageState();
+}
+
+class _OwnerRolesPageState extends State<_OwnerRolesPage> {
+  final _svc = OnechatService();
+  final _query = TextEditingController();
+  List<Map<String, dynamic>> _results = [];
+  bool _searching = false;
+
+  String _roleLabel(String? role) => switch (role) {
+        'owner' => t('profile.roleOwner'),
+        'staff' => t('profile.roleStaff'),
+        'moderator' => t('profile.roleMod'),
+        _ => t('profile.roleUser'),
+      };
+
+  Future<void> _search() async {
+    setState(() => _searching = true);
+    try {
+      final rows = await _svc.searchProfiles(_query.text);
+      if (mounted) setState(() => _results = rows);
+    } finally {
+      if (mounted) setState(() => _searching = false);
+    }
+  }
+
+  Future<void> _setRole(Map<String, dynamic> p, String role) async {
+    final nick = p['nickname'] as String;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t('owner.setRole', {'nick': nick})),
+        content: Text(t('owner.confirmRole',
+            {'nick': nick, 'role': _roleLabel(role)})),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(t('sheet.cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(t('sheet.yesApply')),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final done = await _svc.setGlobalRole(p['uid'] as String, role);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(done
+            ? t('owner.roleSet',
+                {'nick': nick, 'role': _roleLabel(role)})
+            : t('owner.roleFailed'))));
+    if (done) _search();
+  }
+
+  @override
+  void dispose() {
+    _query.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(t('owner.panelTitle'))),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Text(t('owner.panelHint'),
+              style: TextStyle(
+                  color:
+                      Theme.of(context).colorScheme.onSurfaceVariant)),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _query,
+                  decoration:
+                      InputDecoration(labelText: t('owner.searchHint')),
+                  onSubmitted: (_) => _search(),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton.filled(
+                onPressed: _searching ? null : _search,
+                icon: const Icon(Icons.search),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          if (_results.isEmpty)
+            Text(t('owner.noResults'))
+          else
+            for (final p in _results)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  backgroundColor:
+                      nickColor(p['nickname_color'] as String?),
+                  child: Text(
+                    (p['nickname'] as String)
+                        .substring(0, 1)
+                        .toUpperCase(),
+                    style: const TextStyle(
+                        color: Colors.black, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                title: Text(p['nickname'] as String),
+                subtitle: Text(_roleLabel(p['global_role'] as String?)),
+                trailing: p['global_role'] == 'owner'
+                    ? null
+                    : PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert),
+                        onSelected: (role) => _setRole(p, role),
+                        itemBuilder: (_) => [
+                          for (final role
+                              in ['user', 'moderator', 'staff'])
+                            PopupMenuItem(
+                              value: role,
+                              child: Text(_roleLabel(role)),
+                            ),
+                        ],
+                      ),
+              ),
+        ],
+      ),
     );
   }
 }

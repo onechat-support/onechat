@@ -37,7 +37,9 @@ class ChatPage extends StatefulWidget {
 class _ChatPageState extends State<ChatPage> {
   final _svc = OnechatService();
   final _input = TextEditingController();
+  final _inputFocus = FocusNode();
   final _scroll = ScrollController();
+  List<Map<String, dynamic>> _mentionHints = [];
   final List<Map<String, dynamic>> _messages = [];
   final Map<String, Map<String, dynamic>> _profiles = {};
   final Set<int> _knownIds = {};
@@ -84,7 +86,98 @@ class _ChatPageState extends State<ChatPage> {
   void initState() {
     super.initState();
     _profiles[widget.myProfile['uid'] as String] = widget.myProfile;
+    _input.addListener(_updateMentionHints);
     _init();
+  }
+
+  /// Punto 7: si mi perfil cambia en la pestaña Perfil (p. ej. el
+  /// color del nick), la sala ya montada — la General sobre todo —
+  /// debe reflejarlo al instante, no con la foto vieja del inicio.
+  @override
+  void didUpdateWidget(ChatPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.myProfile['nickname_color'] !=
+            widget.myProfile['nickname_color'] ||
+        oldWidget.myProfile['nickname'] != widget.myProfile['nickname']) {
+      _profiles[widget.myProfile['uid'] as String] = widget.myProfile;
+      if (mounted) setState(() {});
+    }
+  }
+
+  // ---------- Menciones (punto 1) ----------
+
+  /// Inserta «@Nick » en el campo de texto, donde va el cursor.
+  void _mention(Map<String, dynamic> profile) {
+    final nick = profile['nickname'] as String;
+    final text = _input.text;
+    final sel = _input.selection;
+    final at = (sel.start >= 0 && sel.start <= text.length)
+        ? sel.start
+        : text.length;
+    final insert = '@$nick ';
+    _input.value = TextEditingValue(
+      text: text.replaceRange(at, at, insert),
+      selection: TextSelection.collapsed(offset: at + insert.length),
+    );
+    _inputFocus.requestFocus();
+  }
+
+  /// Autocompletado: si la palabra que se está escribiendo empieza
+  /// con @, sugiere nicks de la sala que coincidan.
+  void _updateMentionHints() {
+    final text = _input.text;
+    final cursor = _input.selection.start;
+    if (cursor < 0 || cursor > text.length) return;
+    final upto = text.substring(0, cursor);
+    final match = RegExp(r'@([A-Za-z0-9_]*)$').firstMatch(upto);
+    if (match == null) {
+      if (_mentionHints.isNotEmpty) {
+        setState(() => _mentionHints = []);
+      }
+      return;
+    }
+    final partial = match.group(1)!.toLowerCase();
+    final seen = <String>{};
+    final hints = <Map<String, dynamic>>[];
+    for (final p in _profiles.values) {
+      final nick = p['nickname'] as String?;
+      if (nick == null) continue;
+      final lower = nick.toLowerCase();
+      if (p['uid'] == _svc.myUid || seen.contains(lower)) continue;
+      if (lower.startsWith(partial)) {
+        seen.add(lower);
+        hints.add(p);
+      }
+    }
+    hints.sort((a, b) => (a['nickname'] as String)
+        .toLowerCase()
+        .compareTo((b['nickname'] as String).toLowerCase()));
+    final top = hints.take(6).toList();
+    if (top.length != _mentionHints.length ||
+        (top.isNotEmpty &&
+            _mentionHints.isNotEmpty &&
+            top.first['uid'] != _mentionHints.first['uid']) ||
+        (top.isEmpty != _mentionHints.isEmpty)) {
+      setState(() => _mentionHints = top);
+    }
+  }
+
+  void _pickMentionHint(Map<String, dynamic> profile) {
+    final nick = profile['nickname'] as String;
+    final text = _input.text;
+    final cursor = _input.selection.start;
+    if (cursor < 0 || cursor > text.length) return;
+    final upto = text.substring(0, cursor);
+    final match = RegExp(r'@([A-Za-z0-9_]*)$').firstMatch(upto);
+    if (match == null) return;
+    final start = cursor - match.group(0)!.length;
+    final insert = '@$nick ';
+    _input.value = TextEditingValue(
+      text: text.replaceRange(start, cursor, insert) +
+          text.substring(cursor),
+      selection: TextSelection.collapsed(offset: start + insert.length),
+    );
+    _inputFocus.requestFocus();
   }
 
   /// Prepara un susurro para la línea de tiempo: guarda los perfiles
@@ -215,6 +308,20 @@ class _ChatPageState extends State<ChatPage> {
         setState(() => _occupants = occupants);
       },
     );
+
+    // Punto 12: aviso de sistema «se conectó» (con freno de 10 min
+    // para no spamear al entrar y salir de la sala).
+    if (_myMember?['banned_at'] == null) {
+      final already = await _svc.recentOwnSystemNotice(_roomId, 'join');
+      if (!already) {
+        final row = await _svc.sendSystemNotice(_roomId, 'join');
+        if (row != null && mounted) {
+          final id = row['id'];
+          if (id is int) _knownIds.add(id);
+          setState(() => _messages.add(row));
+        }
+      }
+    }
   }
 
   bool _isBlocked(Map<String, dynamic> row) {
@@ -232,15 +339,49 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   void dispose() {
+    // Punto 12: aviso «se desconectó» (mejor esfuerzo al salir).
+    if (_myMember?['banned_at'] == null) {
+      _svc.sendSystemNotice(_roomId, 'leave');
+    }
     final a = _msgChannel;
     final b = _presenceChannel;
     final c = _whisperChannel;
     if (a != null) _svc.unsubscribe(a);
     if (b != null) _svc.unsubscribe(b);
     if (c != null) _svc.unsubscribe(c);
+    _input.removeListener(_updateMentionHints);
     _input.dispose();
+    _inputFocus.dispose();
     _scroll.dispose();
     super.dispose();
+  }
+
+  /// Aviso del sistema dentro de la sala (punto 12): centrado y
+  /// discreto. Las sanciones NO muestran el nick del castigado.
+  Widget _systemTile(Map<String, dynamic> m) {
+    final code = m['body'] as String? ?? '';
+    final nick = m['sender_nickname'] as String? ?? '';
+    final text = switch (code) {
+      'join' => t('chat.systemJoined', {'nick': nick}),
+      'leave' => t('chat.systemLeft', {'nick': nick}),
+      'mod:mute' => t('chat.systemMuted'),
+      'mod:ban' => t('chat.systemBanned'),
+      _ => code,
+    };
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Center(
+        child: Text(
+          text,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontStyle: FontStyle.italic,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
   }
 
   void _startWhisper(Map<String, dynamic> profile) {
@@ -604,7 +745,20 @@ class _ChatPageState extends State<ChatPage> {
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.circle,
                     size: 10, color: OneChatColors.primary),
-                title: Text('${o['nickname'] ?? ''}'),
+                title: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(child: Text('${o['nickname'] ?? ''}')),
+                    for (final icon in rankIcons(
+                        profile: _profiles[o['uid'] as String?],
+                        member: _membersInfo[o['uid'] as String?],
+                        isRoomOwner:
+                            widget.room['owner_uid'] == o['uid'])) ...[
+                      const SizedBox(width: 4),
+                      icon,
+                    ],
+                  ],
+                ),
                 subtitle: _occupantBadge(o['uid'] as String?),
                 onTap: () async {
                   Navigator.pop(context);
@@ -617,6 +771,8 @@ class _ChatPageState extends State<ChatPage> {
                         roomId: _roomId,
                         onWhisper: _startWhisper,
                         onPrivateMessage: _startDm,
+                        onMention: _mention,
+                        memberInfo: _membersInfo[uid],
                         canModerate: _canModerate,
                         canManageRoles: _canManageRoles);
                   }
@@ -737,6 +893,15 @@ class _ChatPageState extends State<ChatPage> {
                               m['sender_nickname'] as String? ??
                               '···';
                           final isMe = sender == _svc.myUid;
+                          if (m['kind'] == 'system') {
+                            // Punto 12: avisos del sistema, solo si
+                            // el usuario los tiene activados.
+                            if (widget.myProfile['show_system_notices'] ==
+                                false) {
+                              return const SizedBox.shrink();
+                            }
+                            return _systemTile(m);
+                          }
                           if (m['is_whisper'] == true) {
                             return _whisperTile(m, p);
                           }
@@ -751,6 +916,9 @@ class _ChatPageState extends State<ChatPage> {
                                     roomId: _roomId,
                                     onWhisper: _startWhisper,
                                     onPrivateMessage: _startDm,
+                                    onMention: _mention,
+                                    memberInfo:
+                                        _membersInfo[p['uid'] as String],
                                     canModerate: _canModerate,
                                     canManageRoles: _canManageRoles),
                             onLongPress: () => _translateMenu(
@@ -762,13 +930,32 @@ class _ChatPageState extends State<ChatPage> {
                                   style: DefaultTextStyle.of(context).style,
                                   children: [
                                     TextSpan(
-                                      text: '$nick: ',
+                                      text: '$nick',
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         color: nickColor(
                                             p?['nickname_color'] as String?),
                                       ),
                                     ),
+                                    for (final icon in rankIcons(
+                                        profile: p,
+                                        member: sender == null
+                                            ? null
+                                            : _membersInfo[sender],
+                                        isRoomOwner:
+                                            widget.room['owner_uid'] ==
+                                                sender,
+                                        size: 13))
+                                      WidgetSpan(
+                                        alignment:
+                                            PlaceholderAlignment.middle,
+                                        child: Padding(
+                                          padding: const EdgeInsets.only(
+                                              left: 3),
+                                          child: icon,
+                                        ),
+                                      ),
+                                    const TextSpan(text: ': '),
                                     TextSpan(
                                       text: m['body'] as String,
                                       style: TextStyle(
@@ -852,6 +1039,22 @@ class _ChatPageState extends State<ChatPage> {
                 ],
               ),
             ),
+          if (_mentionHints.isNotEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(12, 4, 12, 2),
+              child: Wrap(
+                spacing: 8,
+                children: [
+                  for (final h in _mentionHints)
+                    ActionChip(
+                      avatar: const Icon(Icons.alternate_email, size: 14),
+                      label: Text(h['nickname'] as String),
+                      onPressed: () => _pickMentionHint(h),
+                    ),
+                ],
+              ),
+            ),
           SafeArea(
             top: false,
             child: Padding(
@@ -861,6 +1064,7 @@ class _ChatPageState extends State<ChatPage> {
                   Expanded(
                     child: TextField(
                       controller: _input,
+                      focusNode: _inputFocus,
                       enabled: mutedUntil == null,
                       textInputAction: TextInputAction.send,
                       onSubmitted: (_) => _send(),

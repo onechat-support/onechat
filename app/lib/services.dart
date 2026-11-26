@@ -45,7 +45,9 @@ const profileColumns =
     'uid,nickname,nickname_lower,nickname_color,bio,photo_url,'
     'is_guest,global_role,language,country,gender,birth_year,'
     'theme_mode,profile_views,created_at,last_seen_at,'
-    'show_in_directory,is_premium,conduct_accepted_at';
+    'show_in_directory,is_premium,conduct_accepted_at,'
+    'dm_open,whispers_open,show_system_notices,'
+    'sound_enabled,vibrate_enabled';
 
 /// Capa de acceso a Supabase para ONEchat (Etapa 1, MVP).
 /// Toda la seguridad real la impone la base de datos con RLS;
@@ -1180,7 +1182,12 @@ class OnechatService {
       String? themeMode,
       String? country,
       String? language,
-      bool? showInDirectory}) async {
+      bool? showInDirectory,
+      bool? dmOpen,
+      bool? whispersOpen,
+      bool? showSystemNotices,
+      bool? soundEnabled,
+      bool? vibrateEnabled}) async {
     final patch = <String, dynamic>{};
     if (bio != null) patch['bio'] = bio;
     if (colorHex != null) patch['nickname_color'] = colorHex;
@@ -1190,8 +1197,104 @@ class OnechatService {
     if (showInDirectory != null) {
       patch['show_in_directory'] = showInDirectory;
     }
+    if (dmOpen != null) patch['dm_open'] = dmOpen;
+    if (whispersOpen != null) patch['whispers_open'] = whispersOpen;
+    if (showSystemNotices != null) {
+      patch['show_system_notices'] = showSystemNotices;
+    }
+    if (soundEnabled != null) patch['sound_enabled'] = soundEnabled;
+    if (vibrateEnabled != null) {
+      patch['vibrate_enabled'] = vibrateEnabled;
+    }
     if (patch.isEmpty) return;
     await _db.from('profiles').update(patch).eq('uid', myUid!);
+  }
+
+  // ---------- Integración Beta (v1.22/v1.23) ----------
+
+  /// Cambio de nickname atómico en el servidor (punto 13).
+  /// Devuelve: ok | invalid | taken | same | cooldown |
+  /// no_profile | not_authenticated.
+  Future<String> changeNickname(String newNick) async {
+    final r = await _db.rpc('change_nickname', params: {'p_new': newNick});
+    return r as String? ?? 'error';
+  }
+
+  /// ¿Puedo escribirle un privado a este usuario? (punto 11)
+  Future<bool> canDm(String targetUid) async {
+    final r = await _db.rpc('can_dm', params: {'p_target': targetUid});
+    return r == true;
+  }
+
+  /// ¿Puedo susurrarle a este usuario? (punto 14)
+  Future<bool> canWhisper(String targetUid) async {
+    final r =
+        await _db.rpc('can_whisper', params: {'p_target': targetUid});
+    return r == true;
+  }
+
+  /// Panel del dueño: cambiar el rol global de otro usuario
+  /// (punto 2). Solo el dueño global puede; el servidor protege
+  /// al propio dueño y deja auditoría.
+  Future<bool> setGlobalRole(String targetUid, String role) async {
+    final r = await _db.rpc('set_global_role', params: {
+      'p_target': targetUid,
+      'p_role': role,
+    });
+    return r == true;
+  }
+
+  /// Buscar perfiles por nickname (panel del dueño).
+  Future<List<Map<String, dynamic>>> searchProfiles(String query) async {
+    final q = query.trim().replaceAll('%', '').replaceAll('_', '');
+    if (q.length < 2) return [];
+    final rows = await _db
+        .from('profiles')
+        .select(profileColumns)
+        .ilike('nickname', '%$q%')
+        .order('nickname')
+        .limit(30);
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
+  /// Aviso del sistema en la sala (punto 12): kind 'system' con
+  /// código en el cuerpo ('join' | 'leave'); las sanciones las
+  /// inserta el servidor ('mod:mute' | 'mod:ban', sin nick).
+  Future<Map<String, dynamic>?> sendSystemNotice(
+      String roomId, String code) async {
+    try {
+      final row = await _db
+          .from('room_messages')
+          .insert({
+            'room_id': roomId,
+            'sender_uid': myUid,
+            'sender_nickname': await myNickname(),
+            'kind': 'system',
+            'body': code,
+          })
+          .select()
+          .single();
+      return row;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// ¿Ya avisé esto en esta sala hace poco? (freno anti-spam de
+  /// entradas/salidas: 10 minutos).
+  Future<bool> recentOwnSystemNotice(String roomId, String code) async {
+    final since =
+        DateTime.now().toUtc().subtract(const Duration(minutes: 10));
+    final rows = await _db
+        .from('room_messages')
+        .select('id')
+        .eq('room_id', roomId)
+        .eq('sender_uid', myUid!)
+        .eq('kind', 'system')
+        .eq('body', code)
+        .gt('created_at', since.toIso8601String())
+        .limit(1);
+    return rows.isNotEmpty;
   }
 
   // ---------- Galería (web oficial W2) ----------

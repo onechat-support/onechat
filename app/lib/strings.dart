@@ -121,6 +121,16 @@ const _es = {
   'status.favoriteIn': 'Uno de tus favoritos entró',
   'status.moderation': 'Aviso de moderación',
   'status.system': 'Aviso del sistema',
+  'status.modAutoMute':
+      '{target} fue silenciado automáticamente en {room} por publicar un enlace no permitido: {minutes} min (infracción n.º {n}).',
+  'status.modAction': '{actor} {verb} {target} en {room}.',
+  'status.modReportUser':
+      'Reporte de usuario: {reporter} reportó a {target}.',
+  'status.modReportError': 'Reporte de error enviado por {reporter}.',
+  'status.modReportAbuse':
+      'Reporte de ABUSO DE PODER contra {target} (visible solo para el dueño).',
+  'status.linkBlocked':
+      'Tu mensaje en {room} no se publicó: en las salas solo se permiten enlaces de YouTube. Quedaste silenciado {minutes} min.',
   // Perfil
   'profile.guest': 'Invitado',
   'profile.registered': 'Cuenta registrada',
@@ -156,6 +166,48 @@ const _es = {
   'profile.deletePhoto': 'Eliminar foto',
   'sheet.viewPage': 'Ver su página',
   'profile.signOut': 'Cerrar sesión',
+  // Integración Beta: privacidad, nick, equipo y sistema en salas
+  'profile.privacySection': 'Privacidad y contacto',
+  'profile.dmOpen': 'Mensajes privados abiertos',
+  'profile.dmOpenHint':
+      'Si lo apagas, solo podrán escribirte las personas que TÚ tengas en favoritos.',
+  'profile.whispersOpen': 'Aceptar susurros',
+  'profile.whispersOpenHint':
+      'Si lo apagas, nadie podrá susurrarte en las salas, salvo tus favoritos.',
+  'profile.systemNotices': 'Avisos del sistema en las salas',
+  'profile.systemNoticesHint':
+      'Quién entra y sale, y los silencios y baneos (sin mostrar el nick del castigado).',
+  'profile.changeNick': 'Cambiar mi nickname',
+  'profile.nickTitle': 'Cambiar nickname',
+  'profile.nickLabel': 'Nuevo nickname',
+  'profile.nickHint':
+      '3 a 20 caracteres: letras, números y guion bajo. Solo puedes cambiarlo una vez cada 7 días; tus mensajes antiguos conservan el nick con el que se escribieron.',
+  'profile.nickOk': 'Nickname cambiado. ¡Hola, {nick}!',
+  'profile.nickTaken': 'Ese nickname ya está en uso.',
+  'profile.nickInvalid':
+      'Nickname no válido: usa de 3 a 20 letras, números o guion bajo.',
+  'profile.nickSame': 'Ese ya es tu nickname.',
+  'profile.nickCooldown':
+      'Ya cambiaste tu nickname hace poco: podrás cambiarlo de nuevo en unos días (límite de 7 días).',
+  'profile.nickError': 'No se pudo cambiar el nickname.',
+  'profile.roleUser': 'Usuario',
+  'owner.panelTitle': 'Equipo global',
+  'owner.panelHint':
+      'Solo el dueño puede dar o quitar roles globales. Queda registrado en la auditoría.',
+  'owner.searchHint': 'Buscar por nickname (mín. 2 letras)',
+  'owner.noResults': 'Sin resultados.',
+  'owner.setRole': 'Cambiar rol de {nick}',
+  'owner.roleSet': 'Rol de {nick} actualizado a {role}.',
+  'owner.roleFailed': 'No se pudo cambiar el rol.',
+  'owner.confirmRole':
+      '¿Seguro que quieres poner a {nick} como {role}?',
+  'sheet.mention': 'Mencionar',
+  'chat.systemJoined': '{nick} se conectó',
+  'chat.systemLeft': '{nick} se desconectó',
+  'chat.systemMuted': 'Un usuario fue silenciado en esta sala',
+  'chat.systemBanned': 'Un usuario fue baneado de esta sala',
+  'chat.dmClosed': 'Este usuario tiene los mensajes privados cerrados.',
+  'chat.whisperClosed': 'Este usuario no acepta susurros.',
   'profile.deleteAccount': 'Eliminar mi cuenta',
   'profile.deleteTitle': '¿Eliminar tu cuenta?',
   'profile.deleteBody':
@@ -507,6 +559,15 @@ const _en = {
   'status.favoriteIn': 'One of your favorites came in',
   'status.moderation': 'Moderation notice',
   'status.system': 'System notice',
+  'status.modAutoMute':
+      '{target} was automatically muted in {room} for posting a non-allowed link: {minutes} min (infraction no. {n}).',
+  'status.modAction': '{actor} {verb} {target} in {room}.',
+  'status.modReportUser': 'User report: {reporter} reported {target}.',
+  'status.modReportError': 'Error report sent by {reporter}.',
+  'status.modReportAbuse':
+      'ABUSE OF POWER report against {target} (owner only).',
+  'status.linkBlocked':
+      'Your message in {room} was not posted: only YouTube links are allowed in rooms. You were muted for {minutes} min.',
   'profile.guest': 'Guest',
   'profile.registered': 'Registered account',
   'profile.roleOwner': 'ONEchat owner',
@@ -541,6 +602,47 @@ const _en = {
   'profile.deletePhoto': 'Delete photo',
   'sheet.viewPage': 'View page',
   'profile.signOut': 'Sign out',
+  // Beta integration: privacy, nickname, team and room system notices
+  'profile.privacySection': 'Privacy & contact',
+  'profile.dmOpen': 'Direct messages open',
+  'profile.dmOpenHint':
+      'If you turn this off, only people YOU have as favorites can message you.',
+  'profile.whispersOpen': 'Accept whispers',
+  'profile.whispersOpenHint':
+      'If you turn this off, nobody can whisper to you in rooms, except your favorites.',
+  'profile.systemNotices': 'System notices in rooms',
+  'profile.systemNoticesHint':
+      'Who joins and leaves, plus mutes and bans (never showing the punished nickname).',
+  'profile.changeNick': 'Change my nickname',
+  'profile.nickTitle': 'Change nickname',
+  'profile.nickLabel': 'New nickname',
+  'profile.nickHint':
+      '3 to 20 characters: letters, numbers and underscore. You can only change it once every 7 days; your old messages keep the nickname they were written with.',
+  'profile.nickOk': 'Nickname changed. Hi, {nick}!',
+  'profile.nickTaken': 'That nickname is already taken.',
+  'profile.nickInvalid':
+      'Invalid nickname: use 3 to 20 letters, numbers or underscore.',
+  'profile.nickSame': 'That is already your nickname.',
+  'profile.nickCooldown':
+      'You changed your nickname recently: you can change it again in a few days (7-day limit).',
+  'profile.nickError': 'Could not change the nickname.',
+  'profile.roleUser': 'User',
+  'owner.panelTitle': 'Global team',
+  'owner.panelHint':
+      'Only the owner can grant or remove global roles. Changes are recorded in the audit log.',
+  'owner.searchHint': 'Search by nickname (min. 2 letters)',
+  'owner.noResults': 'No results.',
+  'owner.setRole': 'Change role of {nick}',
+  'owner.roleSet': 'Role of {nick} updated to {role}.',
+  'owner.roleFailed': 'Could not change the role.',
+  'owner.confirmRole': 'Set {nick} as {role}?',
+  'sheet.mention': 'Mention',
+  'chat.systemJoined': '{nick} joined',
+  'chat.systemLeft': '{nick} left',
+  'chat.systemMuted': 'A user was muted in this room',
+  'chat.systemBanned': 'A user was banned from this room',
+  'chat.dmClosed': 'This user has direct messages closed.',
+  'chat.whisperClosed': 'This user does not accept whispers.',
   'profile.deleteAccount': 'Delete my account',
   'profile.deleteTitle': 'Delete your account?',
   'profile.deleteBody':

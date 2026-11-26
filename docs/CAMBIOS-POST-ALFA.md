@@ -3,6 +3,13 @@
 Anotados por Mario y por los testers durante el alfa (2026-11-23).
 NO implementar hasta que Mario declare cerrado el early access.
 
+> **ACTUALIZACIÓN 2026-11-26 — ORDEN DE MARIO:** integrar TODOS estos
+> cambios AHORA, durante el Early, para probarlos con los testers y
+> evitar sorpresas al anunciar la Beta. La regla anterior queda
+> reemplazada por esta orden. Implementación por lotes (A servidor y
+> privacidad, B social y visual, C mensajes y multimedia, D Premium),
+> cada lote publicado y verificado en vivo antes de pasar al siguiente.
+
 ## Pedidos de Mario (2026-11-23, chat y sala Ayuda)
 
 1. **Opción «Mencionar» en la ficha del usuario.** Al seleccionar

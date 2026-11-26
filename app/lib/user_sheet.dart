@@ -15,6 +15,40 @@ Color nickColor(String? hex) {
   return v == null ? OneChatColors.primary : Color(0xFF000000 | v);
 }
 
+/// Iconos de rango junto al nickname (punto 4, designados por
+/// Mario): dueño del chat y moderadores = placa de sheriff;
+/// Staff = espadas ⚔️ (el set de iconos no trae espadas);
+/// destacado vigente = manzana. El poder manda sobre el destacado.
+List<Widget> rankIcons({
+  required Map<String, dynamic>? profile,
+  Map<String, dynamic>? member,
+  bool isRoomOwner = false,
+  double size = 15,
+}) {
+  final icons = <Widget>[];
+  final role = profile?['global_role'] as String?;
+  final memberRole = member?['role'] as String?;
+  if (role == 'staff') {
+    icons.add(Text('⚔️', style: TextStyle(fontSize: size - 1)));
+  } else if (role == 'owner' ||
+      role == 'moderator' ||
+      isRoomOwner ||
+      memberRole == 'owner' ||
+      memberRole == 'moderator') {
+    icons.add(Icon(Icons.local_police,
+        size: size, color: OneChatColors.roomOwner));
+  }
+  final feat = member?['featured_until'] as String?;
+  if (feat != null) {
+    final until = DateTime.tryParse(feat);
+    if (until != null && until.isAfter(DateTime.now())) {
+      icons.add(Icon(Icons.apple,
+          size: size, color: OneChatColors.favorite));
+    }
+  }
+  return icons;
+}
+
 /// Ficha pública de un usuario: perfil mínimo + acciones sociales
 /// (favorito, bloquear, reportar) y de la Etapa 2 (susurrar dentro
 /// de la sala, mensaje privado 1:1).
@@ -24,6 +58,8 @@ Future<void> showUserSheet(
   String? roomId,
   void Function(Map<String, dynamic> profile)? onWhisper,
   void Function(Map<String, dynamic> profile)? onPrivateMessage,
+  void Function(Map<String, dynamic> profile)? onMention,
+  Map<String, dynamic>? memberInfo,
   bool canModerate = false,
   bool canManageRoles = false,
 }) {
@@ -35,6 +71,8 @@ Future<void> showUserSheet(
       roomId: roomId,
       onWhisper: onWhisper,
       onPrivateMessage: onPrivateMessage,
+      onMention: onMention,
+      memberInfo: memberInfo,
       canModerate: canModerate,
       canManageRoles: canManageRoles,
     ),
@@ -47,12 +85,16 @@ class _UserSheet extends StatefulWidget {
       this.roomId,
       this.onWhisper,
       this.onPrivateMessage,
+      this.onMention,
+      this.memberInfo,
       this.canModerate = false,
       this.canManageRoles = false});
   final Map<String, dynamic> profile;
   final String? roomId;
   final void Function(Map<String, dynamic> profile)? onWhisper;
   final void Function(Map<String, dynamic> profile)? onPrivateMessage;
+  final void Function(Map<String, dynamic> profile)? onMention;
+  final Map<String, dynamic>? memberInfo;
   final bool canModerate;
   final bool canManageRoles;
 
@@ -393,13 +435,27 @@ class _UserSheetState extends State<_UserSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      p['nickname'] as String,
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: nickColor(p['nickname_color'] as String?),
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            p['nickname'] as String,
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color:
+                                  nickColor(p['nickname_color'] as String?),
+                            ),
+                          ),
+                        ),
+                        for (final icon in rankIcons(
+                            profile: p,
+                            member: widget.memberInfo ?? _member)) ...[
+                          const SizedBox(width: 5),
+                          icon,
+                        ],
+                      ],
                     ),
                     Text(isGuest ? t('profile.guest') : t('profile.registered'),
                         style: TextStyle(
@@ -448,6 +504,15 @@ class _UserSheetState extends State<_UserSheet> {
                     },
                     icon: const Icon(Icons.voice_over_off_outlined),
                     label: Text(t('sheet.whisper')),
+                  ),
+                if (widget.roomId != null && widget.onMention != null)
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      widget.onMention!(widget.profile);
+                    },
+                    icon: const Icon(Icons.alternate_email),
+                    label: Text(t('sheet.mention')),
                   ),
                 OutlinedButton.icon(
                   onPressed: _busy ? null : _toggleFav,
