@@ -1288,6 +1288,30 @@ class OnechatService {
     return rows.isEmpty ? null : rows.first;
   }
 
+  /// Cambios de CUALQUIER sesión de cine de la conversación
+  /// (altas y bajas): así la invitación APARECE EN VIVO en la
+  /// pantalla del invitado aunque ya esté dentro del privado
+  /// (antes solo se enteraba al salir y volver a entrar, porque
+  /// la invitación no genera ningún mensaje).
+  RealtimeChannel subscribeConversationCine(String conversationId,
+      void Function() onChange) {
+    final channel = _db.channel('cine-conv-$conversationId');
+    channel
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'cine_sessions',
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'conversation_id',
+            value: conversationId,
+          ),
+          callback: (_) => onChange(),
+        )
+        .subscribe();
+    return channel;
+  }
+
   RealtimeChannel subscribeCine(
       String sessionId, void Function(Map<String, dynamic> row) onUpdate) {
     final channel = _db.channel('cine-$sessionId');

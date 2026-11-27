@@ -215,6 +215,7 @@ class _DmChatPageState extends State<DmChatPage>
   // Cine juntos Premium (punto 17, migración v1.24)
   Map<String, dynamic>? _cine;
   RealtimeChannel? _cineChannel;
+  RealtimeChannel? _cineConvChannel;
   bool _cineBusy = false;
   Timer? _cineTicker;
 
@@ -301,6 +302,12 @@ class _DmChatPageState extends State<DmChatPage>
     _jumpToBottom();
     _loadGame();
     _loadCine();
+    // La invitación de cine aparece en vivo aunque ya estés
+    // dentro del privado (no genera ningún mensaje).
+    _cineConvChannel =
+        _svc.subscribeConversationCine(widget.conversationId, () {
+      if (mounted) _loadCine();
+    });
     _channel = _svc.subscribeDirectMessages(widget.conversationId, (row) {
       _loadGame();
       _loadCine();
@@ -413,6 +420,8 @@ class _DmChatPageState extends State<DmChatPage>
     _cineTicker?.cancel();
     final cc = _cineChannel;
     if (cc != null) _svc.unsubscribe(cc);
+    final cvc = _cineConvChannel;
+    if (cvc != null) _svc.unsubscribe(cvc);
     final ch = _channel;
     if (ch != null) _svc.unsubscribe(ch);
     final gch = _gameChannel;
