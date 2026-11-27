@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/services.dart' as fservices;
 import 'package:material_ui/material_ui.dart';
@@ -135,7 +136,9 @@ class ConversationsTabState extends State<ConversationsTab> {
                 subtitle: Text(
                   last == null
                       ? t('dm.created')
-                      : '${lastMine ? t('dm.youPrefix') : ''}${last['body'] ?? ''}',
+                      : last['kind'] == 'nudge'
+                          ? t('dm.nudgePreview')
+                          : '${lastMine ? t('dm.youPrefix') : ''}${last['body'] ?? ''}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -183,7 +186,7 @@ class DmChatPage extends StatefulWidget {
 }
 
 class _DmChatPageState extends State<DmChatPage>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   final _svc = OnechatService();
   final _input = TextEditingController();
   final _scroll = ScrollController();
@@ -203,6 +206,11 @@ class _DmChatPageState extends State<DmChatPage>
 
   // Ventana flotante de YouTube en el privado (como en salas).
   String? _floatVideo;
+
+  // Zumbido estilo MSN (v1.27): sacudida de la ventana, sonido
+  // y vibración al recibirlo; espera de 20 s entre envíos.
+  late final AnimationController _shakeCtrl;
+  bool _nudgeCooling = false;
 
   // Cine juntos Premium (punto 17, migración v1.24)
   Map<String, dynamic>? _cine;
@@ -233,7 +241,38 @@ class _DmChatPageState extends State<DmChatPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     setWakelock(true);
+    _shakeCtrl = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 550));
     _init();
+  }
+
+  bool get _vibrateOn => widget.myProfile['vibrate_enabled'] != false;
+
+  /// Sacude la ventana del privado, como el zumbido de MSN.
+  void _shake() {
+    if (_shakeCtrl.isAnimating) return;
+    _shakeCtrl.forward(from: 0);
+  }
+
+  Future<void> _sendNudge() async {
+    if (_nudgeCooling) return;
+    setState(() => _nudgeCooling = true);
+    _shake();
+    if (_soundOn) playSound('nudge');
+    if (_vibrateOn) buzz();
+    try {
+      await _svc.sendNudge(
+          conversationId: widget.conversationId, otherUid: _otherUid);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('$e'.contains('dm_closed')
+                ? t('chat.dmClosed')
+                : t('chat.sendFailed', {'e': '$e'}))));
+      }
+    }
+    await Future.delayed(const Duration(seconds: 20));
+    if (mounted) setState(() => _nudgeCooling = false);
   }
 
   Future<void> _init() async {
@@ -272,7 +311,15 @@ class _DmChatPageState extends State<DmChatPage>
       });
       _jumpToBottom();
       if (row['sender_uid'] != _svc.myUid) {
-        if (_soundOn) playSound('receive');
+        if (row['kind'] == 'nudge') {
+          // Zumbido entrante: sacudida + sonido + vibración,
+          // respetando los interruptores del perfil.
+          _shake();
+          if (_soundOn) playSound('nudge');
+          if (_vibrateOn) buzz();
+        } else if (_soundOn) {
+          playSound('receive');
+        }
         _svc.markConversationRead(widget.conversationId);
       }
     });
@@ -361,6 +408,7 @@ class _DmChatPageState extends State<DmChatPage>
     if (gch != null) _svc.unsubscribe(gch);
     _input.dispose();
     _scroll.dispose();
+    _shakeCtrl.dispose();
     super.dispose();
   }
 
@@ -1050,7 +1098,19 @@ class _DmChatPageState extends State<DmChatPage>
       ),
       body: Stack(
         children: [
-          Column(
+          AnimatedBuilder(
+            animation: _shakeCtrl,
+            builder: (context, child) => Transform.translate(
+              offset: Offset(
+                  _shakeCtrl.isAnimating
+                      ? math.sin(_shakeCtrl.value * math.pi * 7) *
+                          9 *
+                          (1 - _shakeCtrl.value)
+                      : 0.0,
+                  0),
+              child: child,
+            ),
+            child: Column(
             children: [
           Expanded(
             child: _loading
@@ -1066,6 +1126,37 @@ class _DmChatPageState extends State<DmChatPage>
                         itemCount: _messages.length,
                         itemBuilder: (context, i) {
                           final m = _messages[i];
+                          if (m['kind'] == 'nudge') {
+                            final mineN = m['sender_uid'] == _svc.myUid;
+                            return Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 6),
+                              child: Center(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .surfaceContainerHighest,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    mineN
+                                        ? t('dm.nudgeSent',
+                                            {'nick': otherNick})
+                                        : t('dm.nudgeReceived',
+                                            {'nick': otherNick}),
+                                    style: TextStyle(
+                                        fontSize: 12.5,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
                           final isMe = m['sender_uid'] == _svc.myUid;
                           final nick = isMe
                               ? widget.myProfile['nickname'] as String
@@ -1140,6 +1231,12 @@ class _DmChatPageState extends State<DmChatPage>
               padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
               child: Row(
                 children: [
+                  IconButton(
+                    onPressed: _nudgeCooling ? null : _sendNudge,
+                    icon: const Icon(Icons.vibration),
+                    tooltip: t('dm.nudge'),
+                  ),
+                  const SizedBox(width: 2),
                   Expanded(
                     child: TextField(
                       controller: _input,
@@ -1161,6 +1258,7 @@ class _DmChatPageState extends State<DmChatPage>
             ),
           ),
             ],
+            ),
           ),
           if (_floatVideo != null)
             FloatingVideoPlayer(

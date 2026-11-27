@@ -480,6 +480,10 @@ const _es = {
   'dm.hint': 'Escribe un mensaje privado…',
   'dm.greeting': 'Saluda a {nick}: solo ustedes dos ven esta conversación.',
   'dm.youPrefix': 'Tú: ',
+  'dm.nudge': 'Zumbido',
+  'dm.nudgeSent': 'Le enviaste un zumbido a {nick}',
+  'dm.nudgeReceived': '{nick} te envió un zumbido',
+  'dm.nudgePreview': '🔔 Zumbido',
   'dm.errorLoading': 'Error al cargar privados: {e}',
   'dm.empty':
       'Aún no tienes conversaciones privadas.\nEntra a una sala, toca el nombre de alguien y elige «Mensaje privado».',
@@ -932,6 +936,10 @@ const _en = {
   'dm.hint': 'Type a private message…',
   'dm.greeting': 'Say hi to {nick}: only you two can see this conversation.',
   'dm.youPrefix': 'You: ',
+  'dm.nudge': 'Nudge',
+  'dm.nudgeSent': 'You sent {nick} a nudge',
+  'dm.nudgeReceived': '{nick} sent you a nudge',
+  'dm.nudgePreview': '🔔 Nudge',
   'dm.errorLoading': 'Error loading private chats: {e}',
   'dm.empty':
       'You have no private conversations yet.\nEnter a room, tap someone\'s name and choose "Private message".',

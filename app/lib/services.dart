@@ -888,6 +888,30 @@ class OnechatService {
     return inserted;
   }
 
+  /// Zumbido estilo MSN (v1.27): una fila kind='nudge' sin
+  /// cuerpo. Viaja por el mismo tiempo real que los mensajes y
+  /// avisa al otro con la notificación habitual de privado.
+  Future<void> sendNudge({
+    required String conversationId,
+    required String otherUid,
+  }) async {
+    await _db.from('direct_messages').insert({
+      'conversation_id': conversationId,
+      'sender_uid': myUid,
+      'kind': 'nudge',
+    });
+    await _db.from('notifications').insert({
+      'uid': otherUid,
+      'kind': 'dm',
+      'payload': {
+        'conversation_id': conversationId,
+        'from_uid': myUid,
+        'from_nickname': await myNickname(),
+        'nudge': true,
+      },
+    });
+  }
+
   /// Marca como leídos los privados que me enviaron en esta
   /// conversación (la regla de la base solo deja hacerlo al
   /// destinatario).
