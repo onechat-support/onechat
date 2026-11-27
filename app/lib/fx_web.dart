@@ -55,55 +55,72 @@ Future<void> _requestWakeLock() async {
   } catch (_) {}
 }
 
-int _ytCounter = 0;
+final Map<String, Widget> _ytPlayers = {};
 
 /// Reproductor oficial de YouTube incrustado (iframe de
-/// youtube-nocookie). No reproduce solo: arranca cuando la
-/// persona toca la tarjeta y el propio reproductor.
+/// youtube-nocookie) con autoplay: solo aparece cuando la
+/// persona toca una tarjeta, y ese toque es la orden de
+/// reproducir; se pausa solo con los controles del propio
+/// reproductor.
+///
+/// El widget se CACHEA por video. Antes se creaba un iframe
+/// nuevo en cada reconstrucción de la pantalla y el video se
+/// cortaba al mover la ventana flotante, al tocar fuera de
+/// ella (el teclado reconstruye la vista) o al llegar un
+/// mensaje (reportado por Mario, 2026-11-26). Devolviendo
+/// siempre el mismo widget, Flutter no toca el iframe y la
+/// reproducción sigue.
 Widget youtubePlayer(String videoId) {
-  final viewType = 'onechat-yt-$videoId-${_ytCounter++}';
-  ui_web.platformViewRegistry.registerViewFactory(viewType, (int _) {
-    final iframe = html.IFrameElement()
-      ..src = 'https://www.youtube-nocookie.com/embed/$videoId?rel=0'
-      ..style.border = 'none'
-      ..style.width = '100%'
-      ..style.height = '100%'
-      ..allow =
-          'accelerometer; encrypted-media; gyroscope; picture-in-picture'
-      ..allowFullscreen = true;
-    return iframe;
+  return _ytPlayers.putIfAbsent(videoId, () {
+    final viewType = 'onechat-yt-$videoId';
+    ui_web.platformViewRegistry.registerViewFactory(viewType, (int _) {
+      final iframe = html.IFrameElement()
+        ..src = 'https://www.youtube-nocookie.com/embed/$videoId'
+            '?autoplay=1&playsinline=1&rel=0'
+        ..style.border = 'none'
+        ..style.width = '100%'
+        ..style.height = '100%'
+        ..allow = 'autoplay; accelerometer; encrypted-media; '
+            'gyroscope; picture-in-picture'
+        ..allowFullscreen = true;
+      return iframe;
+    });
+    return AspectRatio(
+      aspectRatio: 16 / 9,
+      child: HtmlElementView(viewType: viewType),
+    );
   });
-  return AspectRatio(
-    aspectRatio: 16 / 9,
-    child: HtmlElementView(viewType: viewType),
-  );
 }
 
 final Map<String, html.IFrameElement> _cineFrames = {};
-int _cineCounter = 0;
+final Map<String, Widget> _cinePlayers = {};
 
 /// Reproductor de «Cine juntos»: iframe oficial con la API
 /// activada (enablejsapi) y sin controles propios, porque los
 /// controles son los de la app y mandan sobre los dos lados a la
-/// vez a través del estado compartido en el servidor.
+/// vez a través del estado compartido en el servidor. También
+/// cacheado por sesión+video: el marcador de 1 segundo de la
+/// pantalla reconstruye seguido y no debe reiniciar el video.
 Widget cinePlayer(String key, String videoId) {
-  final viewType = 'onechat-cine-$key-${_cineCounter++}';
-  ui_web.platformViewRegistry.registerViewFactory(viewType, (int _) {
-    final iframe = html.IFrameElement()
-      ..src =
-          'https://www.youtube-nocookie.com/embed/$videoId?enablejsapi=1&controls=0&rel=0&playsinline=1'
-      ..style.border = 'none'
-      ..style.width = '100%'
-      ..style.height = '100%'
-      ..allow = 'encrypted-media; picture-in-picture'
-      ..allowFullscreen = true;
-    _cineFrames[key] = iframe;
-    return iframe;
+  return _cinePlayers.putIfAbsent('$key|$videoId', () {
+    final viewType = 'onechat-cine-$key-$videoId';
+    ui_web.platformViewRegistry.registerViewFactory(viewType, (int _) {
+      final iframe = html.IFrameElement()
+        ..src =
+            'https://www.youtube-nocookie.com/embed/$videoId?enablejsapi=1&controls=0&rel=0&playsinline=1'
+        ..style.border = 'none'
+        ..style.width = '100%'
+        ..style.height = '100%'
+        ..allow = 'encrypted-media; picture-in-picture'
+        ..allowFullscreen = true;
+      _cineFrames[key] = iframe;
+      return iframe;
+    });
+    return AspectRatio(
+      aspectRatio: 16 / 9,
+      child: HtmlElementView(viewType: viewType),
+    );
   });
-  return AspectRatio(
-    aspectRatio: 16 / 9,
-    child: HtmlElementView(viewType: viewType),
-  );
 }
 
 /// Envía un comando al reproductor de cine (playVideo, pauseVideo
