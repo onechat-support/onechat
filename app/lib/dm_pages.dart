@@ -218,6 +218,13 @@ class _DmChatPageState extends State<DmChatPage>
   RealtimeChannel? _cineConvChannel;
   bool _cineBusy = false;
   Timer? _cineTicker;
+  // El video parte solo y EN SILENCIO al aceptarse (los
+  // navegadores no dejan que arranque con sonido sin un toque
+  // en ESE teléfono); el chip «Activar sonido» lo desmutea y
+  // re-sincroniza. _cinePrimedFor: sesión ya llevada a la
+  // posición compartida tras cargar el reproductor.
+  bool _cineSoundOn = false;
+  String? _cinePrimedFor;
 
   String get _otherUid => widget.other['uid'] as String;
 
@@ -621,7 +628,25 @@ class _DmChatPageState extends State<DmChatPage>
   void _setCine(Map<String, dynamic>? session) {
     _cineTicker?.cancel();
     _cineTicker = null;
+    if (session == null || session['id'] != _cine?['id']) {
+      _cineSoundOn = false;
+    }
     setState(() => _cine = session);
+    if (session != null &&
+        session['status'] == 'active' &&
+        _cinePrimedFor != session['id']) {
+      // Recién activada (o recién abierta a media sesión): el
+      // reproductor parte solo desde 0; hay que llevarlo a la
+      // posición compartida en cuanto carga.
+      _cinePrimedFor = session['id'] as String;
+      final id = _cinePrimedFor!;
+      Future.delayed(const Duration(milliseconds: 1400), () {
+        if (!mounted || _cine?['id'] != id) return;
+        cineCommand(id, 'seekTo', _cinePosition());
+        cineCommand(id,
+            _cine?['play_state'] == 'playing' ? 'playVideo' : 'pauseVideo');
+      });
+    }
     if (session != null && session['status'] == 'active') {
       // Reloj de la posición mientras suena (solo redibuja).
       _cineTicker = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -740,8 +765,16 @@ class _DmChatPageState extends State<DmChatPage>
     setState(() => _cineBusy = true);
     try {
       await _svc.respondCine(id, accept);
-      final s = await _svc.fetchCineById(id);
+      var s = await _svc.fetchCineById(id);
       if (!mounted) return;
+      if (s != null && accept && s['status'] == 'active') {
+        // Al aceptar, el video ARRANCA SOLO en los dos teléfonos
+        // (en silencio; el sonido se activa con un toque): el
+        // estado compartido parte en «playing» desde 0.
+        await _svc.controlCine(id, 'playing', 0);
+        s = await _svc.fetchCineById(id);
+        if (!mounted) return;
+      }
       if (s == null ||
           s['status'] == 'declined' ||
           s['status'] == 'ended') {
@@ -752,6 +785,18 @@ class _DmChatPageState extends State<DmChatPage>
     } finally {
       if (mounted) setState(() => _cineBusy = false);
     }
+  }
+
+  /// Chip «Activar sonido»: desmutea (gesto del usuario en su
+  /// propio teléfono, lo que el navegador exige) y re-sincroniza
+  /// al segundo compartido.
+  void _enableCineSound(String id) {
+    cineCommand(id, 'unMute');
+    cineCommand(id, 'seekTo', _cinePosition());
+    if (_cine?['play_state'] == 'playing') {
+      cineCommand(id, 'playVideo');
+    }
+    setState(() => _cineSoundOn = true);
   }
 
   Future<void> _endCine() async {
@@ -885,7 +930,52 @@ class _DmChatPageState extends State<DmChatPage>
           ),
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: cinePlayer(c['id'] as String, videoId),
+            child: Stack(
+              children: [
+                cinePlayer(c['id'] as String, videoId),
+                // Tapa el botón rojo propio de YouTube: tocar el
+                // video pausa/reanuda PARA AMBOS desde los
+                // controles del chat (el botón del reproductor
+                // no avisa al otro y rompía la sincronía).
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _cineBusy ? null : _cineTogglePlay,
+                  ),
+                ),
+                if (!_cineSoundOn)
+                  Positioned(
+                    right: 8,
+                    bottom: 8,
+                    child: Material(
+                      color: Colors.black87,
+                      borderRadius: BorderRadius.circular(20),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(20),
+                        onTap: () =>
+                            _enableCineSound(c['id'] as String),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 7),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.volume_up,
+                                  size: 16, color: Colors.white),
+                              const SizedBox(width: 6),
+                              Text(t('cine.enableSound'),
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
           const SizedBox(height: 6),
           Row(

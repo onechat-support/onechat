@@ -8,7 +8,7 @@
 class AppConfig {
   /// Sello visible de la versión (Perfil): sirve para confirmar
   /// qué tan fresca es la copia que el navegador está ejecutando.
-  static const appVersion = '2026.11.26.14';
+  static const appVersion = '2026.11.26.15';
 
   /// Sitio oficial (lugar web definitivo): portada, Comunidad
   /// y páginas personales con Galería en `/u/<nickname>`.

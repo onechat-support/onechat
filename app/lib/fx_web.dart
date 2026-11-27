@@ -108,11 +108,11 @@ Widget cinePlayer(String key, String videoId) {
     ui_web.platformViewRegistry.registerViewFactory(viewType, (int _) {
       final iframe = html.IFrameElement()
         ..src =
-            'https://www.youtube-nocookie.com/embed/$videoId?enablejsapi=1&controls=0&rel=0&playsinline=1'
+            'https://www.youtube-nocookie.com/embed/$videoId?enablejsapi=1&controls=0&rel=0&playsinline=1&autoplay=1&mute=1'
         ..style.border = 'none'
         ..style.width = '100%'
         ..style.height = '100%'
-        ..allow = 'encrypted-media; picture-in-picture'
+        ..allow = 'autoplay; encrypted-media; picture-in-picture'
         ..allowFullscreen = true;
       _cineFrames[key] = iframe;
       return iframe;

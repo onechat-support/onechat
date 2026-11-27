@@ -137,3 +137,22 @@ Con el Lote D, **la integración de los 17 cambios está completa**:
 los cuatro lotes están publicados y verificados en vivo dentro del
 Early, que es justo lo que se buscaba: que lo nuevo se rompa aquí,
 con los testers, y no el día del anuncio de la Beta.
+
+## Addendum v2026.11.26.13–.14 (2026-11-27)
+
+- **v.13 — Ficha de usuario desplazable**: con la Galería grande
+  (v.10) el contenido de la ficha dejó de caber en pantalla y
+  los botones quedaban cortados. `showUserSheet` ahora usa
+  `isScrollControlled` y el contenido va en un
+  `SingleChildScrollView` con tope del 90 % de la pantalla.
+- **v.14 — La invitación de Cine aparece EN VIVO**: la
+  invitación no genera ningún mensaje, así que si el invitado
+  ya estaba dentro del privado no se enteraba hasta salir y
+  volver a entrar. `DmChatPage` ahora se suscribe a los cambios
+  de `cine_sessions` de la conversación
+  (`subscribeConversationCine`) y recarga el área de cine al
+  instante. Caso real que lo destapó: invitación de Zeeth a
+  YouShookMe (2026-11-27 02:53 PT) creada y notificada sin
+  problema, pero cancelada desde la propia cuenta de Zeeth a
+  los 90 segundos (botón «Cancelar» de su tarjeta), por lo que
+  el invitado nunca llegó a verla.
