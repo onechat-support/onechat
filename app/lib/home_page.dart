@@ -736,6 +736,10 @@ class _ProfileTabState extends State<_ProfileTab> {
     try {
       await _svc.uploadGalleryPhoto(picked.$1, picked.$2);
       await _loadGallery();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(t('profile.photoAdded'))));
+      }
     } catch (e) {
       if (!mounted) return;
       final limit = e.toString().contains('gallery_limit');

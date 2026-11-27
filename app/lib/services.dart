@@ -617,11 +617,21 @@ class OnechatService {
     );
     channel
         .onPresenceSync((payload) {
-          final occupants = channel
-              .presenceState()
-              .expand((s) => s.presences)
-              .map((p) => p.payload)
-              .toList();
+          // Una persona, un ocupante: si el mismo usuario está
+          // conectado dos veces (salió a la web y volvió, o dos
+          // pestañas), Presence guarda una presencia por
+          // conexión y el contador lo contaba repetido
+          // (reportado por Mario, 2026-11-26). Se deduplica
+          // por uid.
+          final seen = <String>{};
+          final occupants = <Map<String, dynamic>>[];
+          for (final state in channel.presenceState()) {
+            for (final presence in state.presences) {
+              final data = presence.payload;
+              final uid = data['uid'] as String?;
+              if (uid == null || seen.add(uid)) occupants.add(data);
+            }
+          }
           onSync(occupants);
         })
         .subscribe((status, error) async {
@@ -1403,6 +1413,17 @@ class OnechatService {
         .from('gallery_photos')
         .select()
         .eq('uid', myUid!)
+        .order('created_at');
+    return List<Map<String, dynamic>>.from(rows);
+  }
+
+  /// Galería de cualquier usuario (para verla en su ficha
+  /// dentro del chat, como carrusel).
+  Future<List<Map<String, dynamic>>> galleryOf(String uid) async {
+    final rows = await _db
+        .from('gallery_photos')
+        .select()
+        .eq('uid', uid)
         .order('created_at');
     return List<Map<String, dynamic>>.from(rows);
   }

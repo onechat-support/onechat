@@ -165,6 +165,8 @@ const _es = {
   'profile.photoLimit':
       'Llegaste a las 3 fotos gratis. Con Premium podrás subir ilimitadas.',
   'profile.uploading': 'Subiendo…',
+  'profile.photoAdded': 'Foto publicada en tu Galería.',
+  'sheet.gallery': 'Galería',
   'profile.deletePhoto': 'Eliminar foto',
   'sheet.viewPage': 'Ver su página',
   'profile.signOut': 'Cerrar sesión',
@@ -625,6 +627,8 @@ const _en = {
   'profile.photoLimit':
       'You reached the 3 free photos. Premium will allow unlimited uploads.',
   'profile.uploading': 'Uploading…',
+  'profile.photoAdded': 'Photo published to your Gallery.',
+  'sheet.gallery': 'Gallery',
   'profile.deletePhoto': 'Delete photo',
   'sheet.viewPage': 'View page',
   'profile.signOut': 'Sign out',

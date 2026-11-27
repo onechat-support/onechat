@@ -110,6 +110,7 @@ class _UserSheetState extends State<_UserSheet> {
   Map<String, dynamic>? _lastConn;
   String _myRole = 'user';
   List<Map<String, dynamic>> _bans = [];
+  List<Map<String, dynamic>> _gallery = [];
 
   String get _uid => widget.profile['uid'] as String;
   bool get _isMe => _uid == _svc.myUid;
@@ -117,6 +118,11 @@ class _UserSheetState extends State<_UserSheet> {
   @override
   void initState() {
     super.initState();
+    // Galería del usuario: se muestra como carrusel en la
+    // ficha (también la propia).
+    _svc.galleryOf(_uid).then((rows) {
+      if (mounted) setState(() => _gallery = rows);
+    });
     if (!_isMe) {
       _svc.isFavorite(_uid).then((v) {
         if (mounted) setState(() => _isFav = v);
@@ -470,6 +476,13 @@ class _UserSheetState extends State<_UserSheet> {
             const SizedBox(height: 14),
             Text(p['bio'] as String),
           ],
+          if (_gallery.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Text(t('sheet.gallery'),
+                style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            _GalleryCarousel(photos: _gallery),
+          ],
           if (_lastConn != null) ...[
             const SizedBox(height: 10),
             Text(
@@ -693,6 +706,72 @@ class _UserSheetState extends State<_UserSheet> {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Carrusel de la Galería dentro de la ficha del usuario
+/// (pedido de Mario, 2026-11-26): las fotos se deslizan de
+/// lado; en cuentas básicas son hasta 3. Contador «1 / 3».
+class _GalleryCarousel extends StatefulWidget {
+  const _GalleryCarousel({required this.photos});
+  final List<Map<String, dynamic>> photos;
+
+  @override
+  State<_GalleryCarousel> createState() => _GalleryCarouselState();
+}
+
+class _GalleryCarouselState extends State<_GalleryCarousel> {
+  final _controller = PageController();
+  int _page = 0;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final photos = widget.photos;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: 230,
+          child: PageView.builder(
+            controller: _controller,
+            itemCount: photos.length,
+            onPageChanged: (i) => setState(() => _page = i),
+            itemBuilder: (context, i) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  photos[i]['url'] as String,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  errorBuilder: (_, __, ___) => Container(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest,
+                    child: const Center(
+                        child: Icon(Icons.broken_image_outlined)),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        if (photos.length > 1) ...[
+          const SizedBox(height: 6),
+          Text('${_page + 1} / ${photos.length}',
+              style: TextStyle(
+                  fontSize: 12,
+                  color:
+                      Theme.of(context).colorScheme.onSurfaceVariant)),
+        ],
+      ],
     );
   }
 }
