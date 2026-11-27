@@ -297,6 +297,11 @@ const _es = {
   'cine.cancel': 'Cancelar',
   'cine.end': 'Terminar',
   'cine.enableSound': 'Activar sonido',
+  'cine.catalog': 'Catálogo de películas gratis',
+  'cine.catalogTitle': 'Películas gratis para ver juntos',
+  'cine.orLink': 'o pega un enlace de YouTube:',
+  'cine.catalogNote':
+      'Clásicos de dominio público y cine libre, verificados para verse dentro del chat. Toca una película para invitar al instante.',
   'cine.watchingWith': 'Viendo juntos con {nick}',
   'cine.inviteSent': 'Invitación enviada',
   'cine.inviteFailed': 'No se pudo enviar la invitación.',
@@ -771,6 +776,11 @@ const _en = {
   'cine.cancel': 'Cancel',
   'cine.end': 'End',
   'cine.enableSound': 'Enable sound',
+  'cine.catalog': 'Free movie catalog',
+  'cine.catalogTitle': 'Free movies to watch together',
+  'cine.orLink': 'or paste a YouTube link:',
+  'cine.catalogNote':
+      'Public-domain classics and free films, verified to play inside the chat. Tap a movie to invite right away.',
   'cine.watchingWith': 'Watching together with {nick}',
   'cine.inviteSent': 'Invitation sent',
   'cine.inviteFailed': 'Could not send the invitation.',

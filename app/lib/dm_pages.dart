@@ -5,6 +5,7 @@ import 'package:flutter/services.dart' as fservices;
 import 'package:material_ui/material_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'cine_catalog.dart';
 import 'fx.dart';
 import 'services.dart';
 import 'strings.dart';
@@ -717,28 +718,54 @@ class _DmChatPageState extends State<DmChatPage>
       return;
     }
     final ctrl = TextEditingController();
-    final ok = await showDialog<bool>(
+    final action = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t('cine.inviteTitle')),
-        content: TextField(
-          controller: ctrl,
-          autofocus: true,
-          decoration: InputDecoration(hintText: t('cine.linkHint')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(ctx, 'CATALOG'),
+              icon: const Icon(Icons.movie_outlined, size: 19),
+              label: Text(t('cine.catalog')),
+            ),
+            const SizedBox(height: 14),
+            Text(t('cine.orLink'),
+                style: TextStyle(
+                    fontSize: 13,
+                    color: Theme.of(ctx).colorScheme.onSurfaceVariant)),
+            const SizedBox(height: 6),
+            TextField(
+              controller: ctrl,
+              decoration: InputDecoration(hintText: t('cine.linkHint')),
+            ),
+          ],
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
+            onPressed: () => Navigator.pop(ctx),
             child: Text(t('cine.cancel')),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
+            onPressed: () => Navigator.pop(ctx, 'SEND'),
             child: Text(t('cine.sendInvite')),
           ),
         ],
       ),
     );
-    if (ok != true || !mounted) return;
+    if (!mounted) return;
+    if (action == 'CATALOG') {
+      final picked = await Navigator.of(context).push<String>(
+        MaterialPageRoute(builder: (_) => const CineCatalogPage()),
+      );
+      if (picked != null && mounted) {
+        await _inviteCineWithId(picked);
+      }
+      return;
+    }
+    if (action != 'SEND') return;
     final videoId = youtubeIdFromText(ctrl.text.trim());
     if (videoId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -746,6 +773,10 @@ class _DmChatPageState extends State<DmChatPage>
       );
       return;
     }
+    await _inviteCineWithId(videoId);
+  }
+
+  Future<void> _inviteCineWithId(String videoId) async {
     setState(() => _cineBusy = true);
     try {
       final id =
