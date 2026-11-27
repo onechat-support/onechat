@@ -472,16 +472,18 @@ class _UserSheetState extends State<_UserSheet> {
               ),
             ],
           ),
-          if ((p['bio'] as String?)?.isNotEmpty == true) ...[
-            const SizedBox(height: 14),
-            Text(p['bio'] as String),
-          ],
+          // Galería grande justo bajo el nick (pedido de Mario,
+          // 2026-11-27), antes de la bio.
           if (_gallery.isNotEmpty) ...[
             const SizedBox(height: 16),
             Text(t('sheet.gallery'),
                 style: const TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
             _GalleryCarousel(photos: _gallery),
+          ],
+          if ((p['bio'] as String?)?.isNotEmpty == true) ...[
+            const SizedBox(height: 14),
+            Text(p['bio'] as String),
           ],
           if (_lastConn != null) ...[
             const SizedBox(height: 10),
@@ -738,7 +740,7 @@ class _GalleryCarouselState extends State<_GalleryCarousel> {
       mainAxisSize: MainAxisSize.min,
       children: [
         SizedBox(
-          height: 230,
+          height: 300,
           child: PageView.builder(
             controller: _controller,
             itemCount: photos.length,

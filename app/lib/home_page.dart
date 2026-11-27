@@ -702,6 +702,8 @@ class _ProfileTabState extends State<_ProfileTab> {
   bool _saving = false;
   List<Map<String, dynamic>> _gallery = [];
   bool _uploading = false;
+  final _galleryCtrl = PageController();
+  int _galleryPage = 0;
 
   bool get _isRegistered => widget.profile['is_guest'] != true;
 
@@ -874,6 +876,7 @@ class _ProfileTabState extends State<_ProfileTab> {
   @override
   void dispose() {
     _bio.dispose();
+    _galleryCtrl.dispose();
     super.dispose();
   }
 
@@ -1078,6 +1081,73 @@ class _ProfileTabState extends State<_ProfileTab> {
           ],
         ),
         const SizedBox(height: 22),
+        // Galería grande y deslizable entre el nick y la barra de
+        // colores (pedido de Mario, 2026-11-27): fotos a ancho
+        // completo que se recorren con el dedo.
+        if (_isRegistered) ...[
+        Text(t('profile.gallery'),
+            style: const TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text(t('profile.galleryHint'),
+            style: TextStyle(
+                fontSize: 12.5,
+                color: Theme.of(context).colorScheme.onSurfaceVariant)),
+        const SizedBox(height: 10),
+        if (_gallery.isNotEmpty) ...[
+          SizedBox(
+            height: 300,
+            child: PageView.builder(
+              controller: _galleryCtrl,
+              itemCount: _gallery.length,
+              onPageChanged: (i) => setState(() => _galleryPage = i),
+              itemBuilder: (context, i) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Image.network(
+                    _gallery[i]['url'] as String,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    errorBuilder: (ctx, err, stack) => Container(
+                      color: Colors.black12,
+                      child: const Center(
+                          child: Icon(Icons.broken_image_outlined)),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                  '${(_galleryPage + 1).clamp(1, _gallery.length)} / ${_gallery.length}',
+                  style: TextStyle(
+                      fontSize: 12.5,
+                      color:
+                          Theme.of(context).colorScheme.onSurfaceVariant)),
+              TextButton.icon(
+                onPressed: () => _deletePhoto(
+                    _gallery[_galleryPage.clamp(0, _gallery.length - 1)]),
+                icon: const Icon(Icons.delete_outline, size: 18),
+                label: Text(t('profile.deletePhoto')),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+        ],
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            onPressed: _uploading ? null : _addPhoto,
+            icon: const Icon(Icons.add_a_photo_outlined),
+            label: Text(
+                _uploading ? t('profile.uploading') : t('profile.addPhoto')),
+          ),
+        ),
+        ],
+        const SizedBox(height: 22),
         Text(t('profile.color'),
             style: const TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 10),
@@ -1231,64 +1301,6 @@ class _ProfileTabState extends State<_ProfileTab> {
             onPressed: () => openExternalUrl(_myPageUrl),
             icon: const Icon(Icons.open_in_new),
             label: Text(t('profile.viewPage')),
-          ),
-          const SizedBox(height: 18),
-          Text(t('profile.gallery'),
-              style: const TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          Text(t('profile.galleryHint'),
-              style: TextStyle(
-                  fontSize: 12.5,
-                  color:
-                      Theme.of(context).colorScheme.onSurfaceVariant)),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              for (final photo in _gallery)
-                Stack(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        photo['url'] as String,
-                        width: 84,
-                        height: 84,
-                        fit: BoxFit.cover,
-                        errorBuilder: (ctx, err, stack) => Container(
-                          width: 84,
-                          height: 84,
-                          color: Colors.black12,
-                          child: const Icon(Icons.broken_image_outlined),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      top: 2,
-                      right: 2,
-                      child: IconButton(
-                        iconSize: 18,
-                        style: IconButton.styleFrom(
-                          backgroundColor: Colors.black54,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.all(4),
-                          minimumSize: const Size(28, 28),
-                        ),
-                        icon: const Icon(Icons.close),
-                        tooltip: t('profile.deletePhoto'),
-                        onPressed: () => _deletePhoto(photo),
-                      ),
-                    ),
-                  ],
-                ),
-              OutlinedButton.icon(
-                onPressed: _uploading ? null : _addPhoto,
-                icon: const Icon(Icons.add_a_photo_outlined),
-                label: Text(
-                    _uploading ? t('profile.uploading') : t('profile.addPhoto')),
-              ),
-            ],
           ),
         ],
         const SizedBox(height: 18),

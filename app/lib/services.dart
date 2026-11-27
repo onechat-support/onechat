@@ -154,12 +154,24 @@ class OnechatService {
     }
   }
 
+  /// Borra el historial de conversaciones privadas del usuario
+  /// (v1.26). Se invoca al cerrar sesión y TAMBIÉN al entrar:
+  /// así, aunque la sesión anterior se haya cerrado con una
+  /// versión antigua de la app (sin el borrado), la lista de
+  /// Privados amanece vacía al volver a entrar.
+  Future<void> _clearPrivateHistory() async {
+    try {
+      await _db.rpc('clear_my_private_history');
+    } catch (_) {}
+  }
+
   /// Inicio de sesión. Devuelve el perfil o null si aún no tiene nickname.
   Future<Map<String, dynamic>?> signIn({
     required String email,
     required String password,
   }) async {
     await _db.auth.signInWithPassword(email: email, password: password);
+    await _clearPrivateHistory();
     return fetchMyProfile();
   }
 
@@ -201,6 +213,7 @@ class OnechatService {
       if (data is Map && data['session'] is Map) {
         await _db.auth.recoverSession(
             jsonEncode(Map<String, dynamic>.from(data['session'] as Map)));
+        await _clearPrivateHistory();
         return await fetchMyProfile();
       }
       throw Exception(t('auth.errNicknameOrPassword'));
@@ -271,9 +284,7 @@ class OnechatService {
       // borra también el historial de conversaciones privadas
       // (la conversación completa, con sus mensajes). El récord
       // de juegos vs vive en game_records y se conserva.
-      try {
-        await _db.rpc('clear_my_private_history');
-      } catch (_) {}
+      await _clearPrivateHistory();
       final profile = await fetchMyProfile();
       if (profile != null && profile['is_guest'] == true) {
         await _db.from('profiles').delete().eq('uid', uid);
