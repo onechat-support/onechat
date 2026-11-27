@@ -648,6 +648,17 @@ class _DmChatPageState extends State<DmChatPage>
       });
     }
     if (session != null && session['status'] == 'active') {
+      // Toques sobre el video: el primero activa el sonido; los
+      // siguientes pausan/reanudan para ambos.
+      final sid = session['id'] as String;
+      setCineTapHandler(sid, () {
+        if (!mounted || _cine?['id'] != sid) return;
+        if (!_cineSoundOn) {
+          _enableCineSound(sid);
+        } else if (!_cineBusy) {
+          _cineTogglePlay();
+        }
+      });
       // Reloj de la posición mientras suena (solo redibuja).
       _cineTicker = Timer.periodic(const Duration(seconds: 1), (_) {
         if (mounted && _cine?['play_state'] == 'playing') {
@@ -933,40 +944,40 @@ class _DmChatPageState extends State<DmChatPage>
             child: Stack(
               children: [
                 cinePlayer(c['id'] as String, videoId),
-                // Tapa el botón rojo propio de YouTube: tocar el
-                // video pausa/reanuda PARA AMBOS desde los
-                // controles del chat (el botón del reproductor
-                // no avisa al otro y rompía la sincronía).
+                // Capa web real sobre el iframe: recibe TODOS los
+                // toques (los widgets del lienzo no los reciben
+                // sobre un iframe). Así ni el botón rojo ni el
+                // botón «Ver en YouTube» se pueden apretar: el
+                // primer toque activa el sonido y los demás
+                // pausan/reanudan para ambos.
                 Positioned.fill(
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: _cineBusy ? null : _cineTogglePlay,
-                  ),
+                  child: cineTapOverlay(c['id'] as String),
                 ),
                 if (!_cineSoundOn)
-                  Positioned(
-                    right: 8,
-                    bottom: 8,
-                    child: Material(
-                      color: Colors.black87,
-                      borderRadius: BorderRadius.circular(20),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(20),
-                        onTap: () =>
-                            _enableCineSound(c['id'] as String),
-                        child: Padding(
+                  // El botón de sonido, en el CENTRO del
+                  // reproductor, donde iría el botón rojo de
+                  // YouTube (es solo visual: el toque lo recibe
+                  // la capa completa).
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Center(
+                        child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 7),
+                              horizontal: 20, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.black87,
+                            borderRadius: BorderRadius.circular(28),
+                          ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               const Icon(Icons.volume_up,
-                                  size: 16, color: Colors.white),
-                              const SizedBox(width: 6),
+                                  size: 22, color: Colors.white),
+                              const SizedBox(width: 8),
                               Text(t('cine.enableSound'),
                                   style: const TextStyle(
                                       color: Colors.white,
-                                      fontSize: 12.5,
+                                      fontSize: 16,
                                       fontWeight: FontWeight.bold)),
                             ],
                           ),

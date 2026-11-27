@@ -17,5 +17,11 @@ Widget cinePlayer(String key, String videoId) => const SizedBox.shrink();
 /// Comando al reproductor de cine fuera de web: sin efecto.
 void cineCommand(String key, String func, [double? arg]) {}
 
+/// Capa de toques sobre el reproductor fuera de web: sin efecto.
+Widget cineTapOverlay(String key) => const SizedBox.shrink();
+
+/// Manejador de toques del reproductor fuera de web: sin efecto.
+void setCineTapHandler(String key, void Function() handler) {}
+
 /// Título de un video de YouTube fuera de web: sin efecto.
 Future<String?> fetchYoutubeTitle(String videoId) async => null;

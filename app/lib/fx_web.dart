@@ -124,6 +124,40 @@ Widget cinePlayer(String key, String videoId) {
   });
 }
 
+final Map<String, Widget> _cineOverlays = {};
+final Map<String, void Function()> _cineTapHandlers = {};
+
+/// Registra qué hacer cuando el usuario toca el reproductor de
+/// cine. La capa de toques es un elemento web real sobre el
+/// iframe: los widgets dibujados en el lienzo de Flutter NO
+/// reciben los toques que caen sobre un iframe (el iframe se
+/// los queda, y su botón «Ver en YouTube» saca al usuario del
+/// chat; su botón rojo rompe la sincronía).
+void setCineTapHandler(String key, void Function() handler) {
+  _cineTapHandlers[key] = handler;
+}
+
+/// Capa transparente sobre el reproductor de cine que sí recibe
+/// los toques del usuario y los pasa al manejador registrado.
+Widget cineTapOverlay(String key) {
+  return _cineOverlays.putIfAbsent(key, () {
+    final viewType = 'onechat-cine-tap-$key';
+    ui_web.platformViewRegistry.registerViewFactory(viewType, (int _) {
+      final div = html.DivElement()
+        ..style.width = '100%'
+        ..style.height = '100%'
+        ..style.cursor = 'pointer'
+        ..style.backgroundColor = 'transparent';
+      div.onClick.listen((_) {
+        final h = _cineTapHandlers[key];
+        if (h != null) h();
+      });
+      return div;
+    });
+    return HtmlElementView(viewType: viewType);
+  });
+}
+
 /// Envía un comando al reproductor de cine (playVideo, pauseVideo
 /// o seekTo con la posición en segundos) por postMessage, el
 /// mecanismo oficial de la API de iframe de YouTube.

@@ -156,3 +156,21 @@ con los testers, y no el día del anuncio de la Beta.
   problema, pero cancelada desde la propia cuenta de Zeeth a
   los 90 segundos (botón «Cancelar» de su tarjeta), por lo que
   el invitado nunca llegó a verla.
+
+## Addendum v2026.11.26.15 (2026-11-27) — Cine: arranque instantáneo
+
+Reporte de Mario probando con YouShookMe: el botón rojo propio
+de YouTube reproducía solo en un teléfono (no avisa a la app) y
+el play del chat hacía correr el contador del invitado sin que
+su video arrancara (su reproductor quedaba «esperando el botón
+rojo» y el navegador bloquea el arranque con sonido sin un
+toque en ese teléfono). Solución (máximo que permite el
+navegador): el reproductor de cine carga con `autoplay=1&mute=1`;
+al aceptar, el estado compartido parte en «playing» desde 0 y
+el video arranca solo en AMBOS teléfonos, en silencio; chip
+«Activar sonido» sobre el video (un toque: unMute + seek a la
+posición compartida); una capa sobre el reproductor intercepta
+los toques — tocar el video pausa/reanuda para ambos vía
+`_cineTogglePlay`, el botón de YouTube ya no se puede apretar;
+al activarse la sesión (o entrar a media sesión) el reproductor
+se lleva a la posición compartida a los ~1,4 s de cargar.
