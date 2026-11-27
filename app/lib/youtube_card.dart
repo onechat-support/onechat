@@ -25,9 +25,14 @@ String? youtubeIdFromText(String text) {
 /// sin autoplay al llegar el mensaje. Si el dueño del video
 /// impide incrustarlo, el reproductor ofrece abrirlo en YouTube.
 class YoutubeCard extends StatefulWidget {
-  const YoutubeCard({super.key, required this.videoId});
+  const YoutubeCard({super.key, required this.videoId, this.onPlay});
 
   final String videoId;
+
+  /// Si se entrega, tocar la miniatura NO despliega el video
+  /// dentro de la conversación: avisa al padre, que lo abre en
+  /// la ventana flotante (FloatingVideoPlayer).
+  final void Function(String videoId)? onPlay;
 
   @override
   State<YoutubeCard> createState() => _YoutubeCardState();
@@ -50,7 +55,14 @@ class _YoutubeCardState extends State<YoutubeCard> {
     return Padding(
       padding: const EdgeInsets.only(top: 6),
       child: InkWell(
-        onTap: () => setState(() => _open = true),
+        onTap: () {
+          final play = widget.onPlay;
+          if (play != null) {
+            play(widget.videoId);
+          } else {
+            setState(() => _open = true);
+          }
+        },
         onLongPress: () =>
             openExternalUrl('https://www.youtube.com/watch?v=${widget.videoId}'),
         borderRadius: BorderRadius.circular(10),
@@ -82,6 +94,105 @@ class _YoutubeCardState extends State<YoutubeCard> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Ventana flotante del reproductor (pedido de Mario,
+/// 2026-11-26): el video no se despliega dentro de la
+/// conversación — flota sobre el chat, se arrastra desde su
+/// barra superior y se cierra con la ✕. La conversación no se
+/// mueve ni se reordena: la ventana vive en su propia capa.
+class FloatingVideoPlayer extends StatefulWidget {
+  const FloatingVideoPlayer({
+    super.key,
+    required this.videoId,
+    required this.onClose,
+  });
+
+  final String videoId;
+  final VoidCallback onClose;
+
+  @override
+  State<FloatingVideoPlayer> createState() => _FloatingVideoPlayerState();
+}
+
+class _FloatingVideoPlayerState extends State<FloatingVideoPlayer> {
+  Offset? _pos;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = (constraints.maxWidth - 24).clamp(200.0, 340.0).toDouble();
+        const barH = 30.0;
+        final totalH = barH + w * 9 / 16;
+        var maxX = constraints.maxWidth - w - 8;
+        if (maxX < 8) maxX = 8;
+        var maxY = constraints.maxHeight - totalH - 8;
+        if (maxY < 8) maxY = 8;
+        var x = _pos?.dx ?? maxX;
+        var y = _pos?.dy ?? (maxY - 64); // por defecto, sobre el compositor
+        x = x.clamp(8.0, maxX).toDouble();
+        y = y.clamp(8.0, maxY).toDouble();
+        return Stack(
+          children: [
+            Positioned(
+              left: x,
+              top: y,
+              child: Material(
+                elevation: 10,
+                borderRadius: BorderRadius.circular(12),
+                clipBehavior: Clip.antiAlias,
+                child: SizedBox(
+                  width: w,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      GestureDetector(
+                        onPanUpdate: (d) => setState(() {
+                          _pos = Offset(
+                            (x + d.delta.dx).clamp(8.0, maxX).toDouble(),
+                            (y + d.delta.dy).clamp(8.0, maxY).toDouble(),
+                          );
+                        }),
+                        child: Container(
+                          height: barH,
+                          color: Colors.black87,
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 8),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.drag_handle,
+                                  size: 16, color: Colors.white70),
+                              const SizedBox(width: 6),
+                              const Expanded(
+                                child: Text('YouTube',
+                                    style: TextStyle(
+                                        color: Colors.white70,
+                                        fontSize: 12)),
+                              ),
+                              InkWell(
+                                onTap: widget.onClose,
+                                child: const Icon(Icons.close,
+                                    size: 18, color: Colors.white),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      KeyedSubtree(
+                        key: ValueKey(widget.videoId),
+                        child: youtubePlayer(widget.videoId),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

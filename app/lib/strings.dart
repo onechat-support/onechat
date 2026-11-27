@@ -101,6 +101,8 @@ const _es = {
   'tabs.status': 'Status',
   'tabs.profile': 'Perfil',
   'rooms.error': 'Error al cargar salas: {error}',
+  'rooms.maxOpen':
+      'Ya tienes 6 salas abiertas. Cierra una para abrir otra.',
   'rooms.platform': 'Plataforma',
   'rooms.latino': 'Latino',
   'rooms.northAmerica': 'Norteamérica',
@@ -562,6 +564,8 @@ const _en = {
   'tabs.status': 'Status',
   'tabs.profile': 'Profile',
   'rooms.error': 'Error loading rooms: {error}',
+  'rooms.maxOpen':
+      'You already have 6 rooms open. Close one to open another.',
   'rooms.platform': 'Platform',
   'rooms.latino': 'Latino',
   'rooms.northAmerica': 'North America',

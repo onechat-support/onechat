@@ -200,6 +200,9 @@ class _DmChatPageState extends State<DmChatPage>
   bool _gameBusy = false;
   final Set<String> _dismissedGames = {};
 
+  // Ventana flotante de YouTube en el privado (como en salas).
+  String? _floatVideo;
+
   // Cine juntos Premium (punto 17, migración v1.24)
   Map<String, dynamic>? _cine;
   RealtimeChannel? _cineChannel;
@@ -997,8 +1000,10 @@ class _DmChatPageState extends State<DmChatPage>
           ],
         ),
       ),
-      body: Column(
+      body: Stack(
         children: [
+          Column(
+            children: [
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
@@ -1066,7 +1071,9 @@ class _DmChatPageState extends State<DmChatPage>
                                         maxWidth: 340),
                                     child: YoutubeCard(
                                         videoId: youtubeIdFromText(
-                                            m['body'] as String)!),
+                                            m['body'] as String)!,
+                                        onPlay: (id) => setState(
+                                            () => _floatVideo = id)),
                                   ),
                               ],
                             ),
@@ -1103,6 +1110,13 @@ class _DmChatPageState extends State<DmChatPage>
               ),
             ),
           ),
+            ],
+          ),
+          if (_floatVideo != null)
+            FloatingVideoPlayer(
+              videoId: _floatVideo!,
+              onClose: () => setState(() => _floatVideo = null),
+            ),
         ],
       ),
     );

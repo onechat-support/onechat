@@ -590,6 +590,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   /// clave `m<id>` mensajes, `w<id>` susurros.
   final Map<String, String> _translations = {};
 
+  // Ventana flotante de YouTube: el video no se despliega en
+  // la conversación; flota sobre el chat (youtube_card.dart).
+  String? _floatVideo;
+
   /// Mantener presionado un mensaje: traducirlo al idioma del
   /// perfil (o volver al original si ya estaba traducido).
   Future<void> _translateMenu(String key, String body) async {
@@ -958,8 +962,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           ...?widget.extraActions,
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
+          Column(
+            children: [
           if ((widget.room['welcome_msg'] as String?)?.isNotEmpty == true)
             Container(
               width: double.infinity,
@@ -1096,7 +1102,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                           maxWidth: 340),
                                       child: YoutubeCard(
                                           videoId: youtubeIdFromText(
-                                              m['body'] as String)!),
+                                              m['body'] as String)!,
+                                          onPlay: (id) => setState(
+                                              () => _floatVideo = id)),
                                     ),
                                 ],
                               ),
@@ -1201,6 +1209,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ),
             ),
           ),
+            ],
+          ),
+          if (_floatVideo != null)
+            FloatingVideoPlayer(
+              videoId: _floatVideo!,
+              onClose: () => setState(() => _floatVideo = null),
+            ),
         ],
       ),
     );

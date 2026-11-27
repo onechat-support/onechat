@@ -7,11 +7,51 @@ import 'dm_pages.dart';
 import 'main.dart';
 import 'report_pages.dart';
 import 'revoked_page.dart';
+import 'rooms_host.dart';
 import 'services.dart';
 import 'strings.dart';
 import 'theme.dart';
 import 'user_sheet.dart';
 import 'web_links.dart';
+
+/// Código ISO del país de la conexión → nombre del país tal
+/// como está en rooms.country. España y el resto de Europa sin
+/// sala propia caen en la sala Europa.
+const _isoToRoomCountry = {
+  'CL': 'Chile',
+  'MX': 'México',
+  'AR': 'Argentina',
+  'CO': 'Colombia',
+  'PE': 'Perú',
+  'VE': 'Venezuela',
+  'EC': 'Ecuador',
+  'BO': 'Bolivia',
+  'PY': 'Paraguay',
+  'UY': 'Uruguay',
+  'BR': 'Brasil',
+  'CU': 'Cuba',
+  'DO': 'República Dominicana',
+  'PR': 'Puerto Rico',
+  'GT': 'Guatemala',
+  'HN': 'Honduras',
+  'SV': 'El Salvador',
+  'NI': 'Nicaragua',
+  'CR': 'Costa Rica',
+  'PA': 'Panamá',
+  'US': 'Estados Unidos',
+  'CA': 'Canadá',
+};
+
+const _europeCodes = {
+  'ES', 'PT', 'FR', 'IT', 'DE', 'GB', 'IE', 'NL', 'BE', 'CH',
+  'AT', 'SE', 'NO', 'DK', 'FI', 'PL', 'CZ', 'SK', 'HU', 'RO',
+  'BG', 'GR', 'HR', 'RS', 'BA', 'SI', 'EE', 'LV', 'LT', 'UA',
+  'RU', 'BY', 'MD', 'AL', 'MK', 'ME', 'IS', 'LU', 'MT', 'CY',
+};
+
+String? roomCountryForIso(String code) =>
+    _isoToRoomCountry[code] ??
+    (_europeCodes.contains(code) ? 'Europa' : null);
 
 /// Pantalla principal del MVP: pestañas Salas · Status · Perfil.
 class HomePage extends StatefulWidget {
@@ -38,6 +78,12 @@ class _HomePageState extends State<HomePage> {
       _profile['global_role'] == 'staff' ||
       _profile['global_role'] == 'owner';
   bool _generalFailed = false;
+  // Pestañas de salas: anfitrión de las salas abiertas y país
+  // de la conexión (para abrir la sala del país junto a
+  // General, pedido de Mario 2026-11-26).
+  final _roomsHostKey = GlobalKey<RoomsHostState>();
+  List<Map<String, dynamic>> _allRooms = [];
+  String? _visitCountry;
   final _statusKey = GlobalKey<_StatusTabState>();
   final _convsKey = GlobalKey<ConversationsTabState>();
   RealtimeChannel? _notifChannel;
@@ -54,7 +100,15 @@ class _HomePageState extends State<HomePage> {
     // la conexión (IP + dispositivo) y, si hay Destierro,
     // lo manda a la pantalla de acceso revocado.
     _svc.entryCheck().then((v) {
-      if (!mounted || v['banned'] != true) return;
+      if (!mounted) return;
+      // País de la conexión (lo resuelve el servidor desde la
+      // IP): con él se abre la sala del país junto a General.
+      final c = v['country'] as String?;
+      if (c != null && c.isNotEmpty) {
+        _visitCountry = c;
+        _maybeAutoOpenCountry();
+      }
+      if (v['banned'] != true) return;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => RevokedPage(verdict: v)),
         (_) => false,
@@ -100,10 +154,39 @@ class _HomePageState extends State<HomePage> {
         _generalRoom = general;
         _ayudaRoom = ayuda;
         _generalFailed = general == null;
+        _allRooms = rooms;
       });
+      _maybeAutoOpenCountry();
     } catch (_) {
       if (mounted) setState(() => _generalFailed = true);
     }
+  }
+
+  /// Si ya se conoce el país de la conexión y las salas están
+  /// cargadas, abre la sala del país junto a General (sin
+  /// cambiar de pestaña: se entra conversando en General).
+  void _maybeAutoOpenCountry() {
+    final code = _visitCountry;
+    if (code == null || _allRooms.isEmpty) return;
+    final name = roomCountryForIso(code);
+    if (name == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _roomsHostKey.currentState?.autoOpenCountry(_allRooms, name);
+    });
+  }
+
+  /// Abre una sala desde la lista de Salas: pasa a ser una
+  /// pestaña junto a General y se salta a ella.
+  void _openRoomFromList(Map<String, dynamic> room) {
+    final host = _roomsHostKey.currentState;
+    if (host == null) return;
+    if (!host.openRoom(room)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(t('rooms.maxOpen'))),
+      );
+      return;
+    }
+    setState(() => _tab = 0);
   }
 
   Widget _generalTab() {
@@ -125,12 +208,12 @@ class _HomePageState extends State<HomePage> {
             : const CircularProgressIndicator(),
       );
     }
-    return ChatPage(
-      room: room,
+    return RoomsHost(
+      key: _roomsHostKey,
+      generalRoom: room,
       myProfile: _profile,
-      embedded: true,
-      onExit: () => setState(() => _tab = 1),
-      extraActions: (_isStaff && _ayudaRoom != null)
+      onGoToRooms: () => setState(() => _tab = 1),
+      generalExtraActions: (_isStaff && _ayudaRoom != null)
           ? [_StaffHelpButton(room: _ayudaRoom!, myProfile: _profile)]
           : null,
     );
@@ -152,7 +235,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final pages = [
       _generalTab(),
-      _RoomsTab(myProfile: _profile),
+      _RoomsTab(myProfile: _profile, onOpenRoom: _openRoomFromList),
       ConversationsTab(key: _convsKey, myProfile: _profile),
       _StatusTab(
         key: _statusKey,
@@ -253,8 +336,9 @@ class _HomePageState extends State<HomePage> {
 }
 
 class _RoomsTab extends StatefulWidget {
-  const _RoomsTab({required this.myProfile});
+  const _RoomsTab({required this.myProfile, required this.onOpenRoom});
   final Map<String, dynamic> myProfile;
+  final void Function(Map<String, dynamic> room) onOpenRoom;
 
   @override
   State<_RoomsTab> createState() => _RoomsTabState();
@@ -337,12 +421,10 @@ class _RoomsTabState extends State<_RoomsTab> {
                           ? t('rooms.regional')
                           : t('rooms.thematicRoom')),
                   trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          ChatPage(room: r, myProfile: widget.myProfile),
-                    ),
-                  ),
+                  // La sala se abre como pestaña junto a General
+                  // (ya no como pantalla encima): así se puede
+                  // chatear en varias salas a la vez deslizando.
+                  onTap: () => widget.onOpenRoom(r),
                 ),
               );
             },
@@ -675,11 +757,11 @@ class _ProfileTabState extends State<_ProfileTab> {
   ];
 
   static const _countries = [
-    'México', 'Guatemala', 'Honduras', 'El Salvador', 'Nicaragua',
-    'Costa Rica', 'Panamá', 'Cuba', 'República Dominicana',
-    'Puerto Rico', 'Colombia', 'Venezuela', 'Ecuador', 'Perú',
-    'Bolivia', 'Paraguay', 'Chile', 'Argentina', 'Uruguay', 'Brasil',
-    'Estados Unidos', 'Canadá', 'España', 'Otro',
+    'Argentina', 'Bolivia', 'Brasil', 'Canadá', 'Chile', 'Colombia',
+    'Costa Rica', 'Cuba', 'Ecuador', 'El Salvador', 'España',
+    'Estados Unidos', 'Guatemala', 'Honduras', 'México', 'Nicaragua',
+    'Panamá', 'Paraguay', 'Perú', 'Puerto Rico', 'República Dominicana',
+    'Uruguay', 'Venezuela', 'Otro',
   ];
 
   String _countryLabel(String c) => switch (c) {

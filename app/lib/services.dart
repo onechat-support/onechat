@@ -261,6 +261,12 @@ class OnechatService {
   Future<void> signOut() async {
     final uid = myUid;
     if (uid != null) {
+      // Limpieza (Mario, 2026-11-26): al cerrar la sesión, las
+      // notificaciones del usuario se borran. Si en cambio
+      // elimina la cuenta, caen en cascada desde el perfil.
+      try {
+        await _db.from('notifications').delete().eq('uid', uid);
+      } catch (_) {}
       final profile = await fetchMyProfile();
       if (profile != null && profile['is_guest'] == true) {
         await _db.from('profiles').delete().eq('uid', uid);
@@ -389,6 +395,17 @@ class OnechatService {
 
   /// Salas públicas ordenadas por sección (Plataforma, Latino,
   /// Norteamérica, Europa, Temáticos) y su orden dentro de ella.
+  /// Clave de orden alfabético en español: minúsculas y sin
+  /// acentos, para que «México» ordene como «Mexico».
+  static String _alphaKey(String s) => s
+      .toLowerCase()
+      .replaceAll(RegExp('[áàä]'), 'a')
+      .replaceAll(RegExp('[éèë]'), 'e')
+      .replaceAll(RegExp('[íìï]'), 'i')
+      .replaceAll(RegExp('[óòö]'), 'o')
+      .replaceAll(RegExp('[úùü]'), 'u')
+      .replaceAll('ñ', 'n');
+
   Future<List<Map<String, dynamic>>> fetchRooms() async {
     final rows = await _db.from('rooms').select().eq('is_public', true);
     final list = List<Map<String, dynamic>>.from(rows);
@@ -396,6 +413,13 @@ class OnechatService {
       final ra = _categoryRank[a['category']] ?? 9;
       final rb = _categoryRank[b['category']] ?? 9;
       if (ra != rb) return ra.compareTo(rb);
+      // Las salas de país se ordenan alfabéticamente por país
+      // (pedido de Mario, 2026-11-26); el resto, por su orden.
+      final ca = a['country'] as String?;
+      final cb = b['country'] as String?;
+      if (ca != null && cb != null) {
+        return _alphaKey(ca).compareTo(_alphaKey(cb));
+      }
       return ((a['sort'] as num?) ?? 0).compareTo((b['sort'] as num?) ?? 0);
     });
     return list;

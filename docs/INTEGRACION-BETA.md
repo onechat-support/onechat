@@ -108,6 +108,32 @@ archivos de sonido responden HTTP 200 en ambas rutas.
   cerrados» sin abrir el chat; el error `dm_closed` y el
   `whispers_closed` ya se muestran con su texto amable.
 
-## Lote D — pendiente (ver CAMBIOS-POST-ALFA.md)
+## Lote D — Premium (punto 17) · HECHO Y EN VIVO (app v2026.11.26.3)
 
-D: Cine juntos Premium (17).
+- **Migración v1.24**: tabla `cine_sessions` (solo lectura para los
+  participantes; sin políticas de escritura) y RPC `cine_invite` /
+  `cine_respond` / `cine_control` / `cine_end`, todas security definer.
+  Invitar exige Premium (o dueño/Staff global, mientras no existan
+  usuarios Premium reales). La invitación llega como aviso
+  `cine_invite` en Status y al tocarlo se abre el privado.
+- **Sincronización**: el estado compartido vive en la fila (play_state,
+  position_sec, updated_at). La posición se estima como posición
+  guardada + tiempo transcurrido si está sonando. Cada reproductor es
+  el oficial de YouTube (youtube-nocookie, sin autoplay, controles
+  propios de la app: play/pausa y ±10 s); cuando el otro pulsa un
+  control, mi reproductor salta a la posición compartida y obedece.
+- **App**: botón «Cine juntos» en el privado junto al Gato; diálogo
+  para pegar el enlace de YouTube; tarjeta de invitación con
+  miniatura (aceptar/rechazar); reproductor + controles al aceptar.
+- **Verificación**: batería API 7/7 (sin Premium no se puede invitar;
+  video inválido rechazado; RLS sin fugas) y camino feliz por SQL
+  (invitar → aceptar → control «playing» en el segundo 42,5 → aviso
+  recibido), con limpieza total de los datos de prueba.
+- **Panel «Early en cifras» actualizado**: las 17 mejoras ya figuran
+  como «en prueba en el Early» y los errores resueltos suben a 9/9
+  (el pendiente era el color del nick propio, corregido en el Lote B).
+
+Con el Lote D, **la integración de los 17 cambios está completa**:
+los cuatro lotes están publicados y verificados en vivo dentro del
+Early, que es justo lo que se buscaba: que lo nuevo se rompa aquí,
+con los testers, y no el día del anuncio de la Beta.

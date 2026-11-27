@@ -67,6 +67,48 @@ Deno.serve(async (req) => {
     .eq("uid", uid)
     .maybeSingle();
 
+  // País de la conexión (v1.25): la app lo usa para abrir la
+  // sala del país junto a General. Caché por IP: si esta IP ya
+  // se resolvió en una visita anterior, se reutiliza el dato y
+  // no se consulta ningún servicio externo.
+  let country: string | null = null;
+  const { data: prevRow } = await admin
+    .from("connection_log")
+    .select("country")
+    .eq("ip", ip)
+    .not("country", "is", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (prevRow?.country) {
+    country = prevRow.country as string;
+  } else if (
+    ip !== "desconocida" && !ip.startsWith("127.") && ip !== "::1" &&
+    !ip.startsWith("192.168.") && !ip.startsWith("10.")
+  ) {
+    try {
+      const r = await fetch(`https://ipapi.co/${ip}/country/`, {
+        signal: AbortSignal.timeout(2500),
+      });
+      if (r.ok) {
+        const c = (await r.text()).trim().toUpperCase();
+        if (/^[A-Z]{2}$/.test(c)) country = c;
+      }
+    } catch { /* Sin país: la app no abre sala automática. */ }
+    if (!country) {
+      try {
+        const r = await fetch(
+          `http://ip-api.com/json/${ip}?fields=countryCode`,
+          { signal: AbortSignal.timeout(2500) },
+        );
+        if (r.ok) {
+          const j = await r.json();
+          if (j?.countryCode) country = String(j.countryCode).toUpperCase();
+        }
+      } catch { /* Ídem. */ }
+    }
+  }
+
   // La visita queda registrada SIEMPRE (también la del
   // desterrado que intenta volver: es evidencia).
   await admin.from("connection_log").insert({
@@ -76,6 +118,7 @@ Deno.serve(async (req) => {
     user_agent: userAgent || null,
     device_id: deviceId,
     fingerprint,
+    country,
   });
 
   // Control del Destierro: cuenta, dispositivo (id o
@@ -105,5 +148,5 @@ Deno.serve(async (req) => {
     return json({ banned: true, permanent, expires_at: latest }, 200);
   }
 
-  return json({ ok: true }, 200);
+  return json({ ok: true, country }, 200);
 });
