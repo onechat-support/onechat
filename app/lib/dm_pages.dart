@@ -1092,7 +1092,9 @@ class _DmChatPageState extends State<DmChatPage>
                                       color: nickColor(colorHex),
                                     ),
                                   ),
-                                  TextSpan(text: m['body'] as String? ?? ''),
+                                  TextSpan(
+                                      text: bodyWithoutYoutubeUrl(
+                                          m['body'] as String? ?? '')),
                                   if (isMe)
                                     TextSpan(
                                       text: t('chat.youSuffix'),
@@ -1117,7 +1119,7 @@ class _DmChatPageState extends State<DmChatPage>
                                   ConstrainedBox(
                                     constraints: const BoxConstraints(
                                         maxWidth: 340),
-                                    child: YoutubeCard(
+                                    child: YoutubeTitleLink(
                                         videoId: youtubeIdFromText(
                                             m['body'] as String)!,
                                         onPlay: (id) => setState(

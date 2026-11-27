@@ -1063,7 +1063,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                       ),
                                     const TextSpan(text: ': '),
                                     TextSpan(
-                                      text: m['body'] as String,
+                                      text: bodyWithoutYoutubeUrl(
+                                          m['body'] as String),
                                       style: TextStyle(
                                         color: mentionsMe
                                             ? OneChatColors.mention
@@ -1092,15 +1093,17 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                                   ],
                                 ),
                               ),
-                                  // Punto 8: tarjeta de YouTube bajo
-                                  // el mensaje, si trae un video.
+                                  // Enlace de YouTube bajo el
+                                  // mensaje, sin previsualización:
+                                  // «YouTube - título», abre la
+                                  // ventana flotante (2026-11-27).
                                   if (youtubeIdFromText(
                                           m['body'] as String) !=
                                       null)
                                     ConstrainedBox(
                                       constraints: const BoxConstraints(
                                           maxWidth: 340),
-                                      child: YoutubeCard(
+                                      child: YoutubeTitleLink(
                                           videoId: youtubeIdFromText(
                                               m['body'] as String)!,
                                           onPlay: (id) => setState(

@@ -20,78 +20,91 @@ String? youtubeIdFromText(String text) {
   return null;
 }
 
-/// Tarjeta de video (punto 8): miniatura con botón de play; al
-/// tocarla se despliega el reproductor oficial dentro de la app,
-/// sin autoplay al llegar el mensaje. Si el dueño del video
-/// impide incrustarlo, el reproductor ofrece abrirlo en YouTube.
-class YoutubeCard extends StatefulWidget {
-  const YoutubeCard({super.key, required this.videoId, this.onPlay});
-
-  final String videoId;
-
-  /// Si se entrega, tocar la miniatura NO despliega el video
-  /// dentro de la conversación: avisa al padre, que lo abre en
-  /// la ventana flotante (FloatingVideoPlayer).
-  final void Function(String videoId)? onPlay;
-
-  @override
-  State<YoutubeCard> createState() => _YoutubeCardState();
+/// La URL de YouTube tal como aparece escrita en el texto.
+String? youtubeUrlMatch(String text) {
+  final patterns = [
+    RegExp(r'youtu\.be/[A-Za-z0-9_-]{6,}'),
+    RegExp(r'youtube\.com/watch\?[^ ]*'),
+    RegExp(r'youtube\.com/shorts/[A-Za-z0-9_-]{6,}'),
+    RegExp(r'youtube\.com/embed/[A-Za-z0-9_-]{6,}'),
+  ];
+  for (final p in patterns) {
+    final m = p.firstMatch(text);
+    if (m != null) return m.group(0);
+  }
+  return null;
 }
 
-class _YoutubeCardState extends State<YoutubeCard> {
-  bool _open = false;
+/// El cuerpo del mensaje sin la URL de YouTube: el enlace
+/// bonito («YouTube - título») la reemplaza visualmente.
+String bodyWithoutYoutubeUrl(String body) {
+  final u = youtubeUrlMatch(body);
+  if (u == null) return body;
+  return body.replaceFirst(u, '').replaceAll(RegExp(r' {2,}'), ' ').trim();
+}
+
+/// Enlace de video SIN previsualización (pedido de Mario,
+/// 2026-11-27): la miniatura ocupaba mucho espacio en la sala.
+/// Queda una sola línea azul, «YouTube - <título del video>»,
+/// que al tocarla abre la ventana flotante. El título llega
+/// del oEmbed oficial de YouTube y se cachea por video
+/// durante la sesión; si no carga, el enlace dice «YouTube».
+class YoutubeTitleLink extends StatefulWidget {
+  const YoutubeTitleLink(
+      {super.key, required this.videoId, required this.onPlay});
+
+  final String videoId;
+  final void Function(String videoId) onPlay;
+
+  @override
+  State<YoutubeTitleLink> createState() => _YoutubeTitleLinkState();
+}
+
+class _YoutubeTitleLinkState extends State<YoutubeTitleLink> {
+  static final Map<String, String> _cache = {};
+  String? _title;
+
+  @override
+  void initState() {
+    super.initState();
+    _title = _cache[widget.videoId];
+    if (_title == null) _load();
+  }
+
+  Future<void> _load() async {
+    final t = await fetchYoutubeTitle(widget.videoId);
+    if (t != null) _cache[widget.videoId] = t;
+    if (mounted && t != null) setState(() => _title = t);
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (_open) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 6),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: youtubePlayer(widget.videoId),
-        ),
-      );
-    }
+    final label = _title == null ? 'YouTube' : 'YouTube - $_title';
     return Padding(
-      padding: const EdgeInsets.only(top: 6),
+      padding: const EdgeInsets.only(top: 3),
       child: InkWell(
-        onTap: () {
-          final play = widget.onPlay;
-          if (play != null) {
-            play(widget.videoId);
-          } else {
-            setState(() => _open = true);
-          }
-        },
-        onLongPress: () =>
-            openExternalUrl('https://www.youtube.com/watch?v=${widget.videoId}'),
-        borderRadius: BorderRadius.circular(10),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              AspectRatio(
-                aspectRatio: 16 / 9,
-                child: Image.network(
-                  'https://i.ytimg.com/vi/${widget.videoId}/hqdefault.jpg',
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    color: Colors.black87,
-                  ),
+        onTap: () => widget.onPlay(widget.videoId),
+        onLongPress: () => openExternalUrl(
+            'https://www.youtube.com/watch?v=${widget.videoId}'),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.play_circle_outline,
+                size: 16, color: Color(0xFF4F8CFF)),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF4F8CFF),
+                  decoration: TextDecoration.underline,
+                  fontSize: 13.5,
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: const BoxDecoration(
-                  color: Colors.black54,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.play_arrow,
-                    color: Colors.white, size: 34),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

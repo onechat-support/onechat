@@ -1,5 +1,6 @@
 // Efectos solo-web (import condicional en fx.dart).
 // ignore: deprecated_member_use, avoid_web_libraries_in_flutter
+import 'dart:convert';
 import 'dart:html' as html;
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
@@ -137,4 +138,20 @@ void cineCommand(String key, String func, [double? arg]) {
     message = '{"event":"command","func":"$func","args":""}';
   }
   win.postMessage(message, '*');
+}
+
+/// Título de un video de YouTube vía su oEmbed oficial (sin
+/// clave y con CORS abierto). Si algo falla devuelve null y la
+/// interfaz muestra solo «YouTube» como texto del enlace.
+Future<String?> fetchYoutubeTitle(String videoId) async {
+  try {
+    final url = 'https://www.youtube.com/oembed?url='
+        'https://www.youtube.com/watch?v=$videoId&format=json';
+    final body = await html.HttpRequest.getString(url);
+    final data = jsonDecode(body);
+    if (data is Map && data['title'] is String) {
+      return data['title'] as String;
+    }
+  } catch (_) {}
+  return null;
 }
