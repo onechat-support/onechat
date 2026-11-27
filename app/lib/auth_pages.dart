@@ -22,6 +22,7 @@ class _SignUpPageState extends State<SignUpPage> {
   final _pass = TextEditingController();
   final _svc = OnechatService();
   bool _busy = false;
+  bool _showPass = false;
   String? _error;
   String? _info;
 
@@ -103,12 +104,21 @@ class _SignUpPageState extends State<SignUpPage> {
                   const SizedBox(height: 14),
                   TextField(
                     controller: _pass,
-                    obscureText: true,
+                    obscureText: !_showPass,
                     autocorrect: false,
                     enableSuggestions: false,
                     decoration: InputDecoration(
                       labelText: t('auth.password'),
                       prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        icon: Icon(_showPass
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined),
+                        tooltip: t(
+                            _showPass ? 'auth.hidePassword' : 'auth.showPassword'),
+                        onPressed: () =>
+                            setState(() => _showPass = !_showPass),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -158,6 +168,8 @@ class _UpdatePasswordPageState extends State<UpdatePasswordPage> {
   final _svc = OnechatService();
   bool _busy = false;
   bool _done = false;
+  bool _showPass = false;
+  bool _showPass2 = false;
   String? _error;
 
   @override
@@ -243,23 +255,43 @@ class _UpdatePasswordPageState extends State<UpdatePasswordPage> {
                     const SizedBox(height: 20),
                     TextField(
                       controller: _pass,
-                      obscureText: true,
+                      obscureText: !_showPass,
                       autocorrect: false,
                       enableSuggestions: false,
                       decoration: InputDecoration(
                         labelText: t('auth.newPassword'),
                         prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          icon: Icon(_showPass
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined),
+                          tooltip: t(_showPass
+                              ? 'auth.hidePassword'
+                              : 'auth.showPassword'),
+                          onPressed: () =>
+                              setState(() => _showPass = !_showPass),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 14),
                     TextField(
                       controller: _pass2,
-                      obscureText: true,
+                      obscureText: !_showPass2,
                       autocorrect: false,
                       enableSuggestions: false,
                       decoration: InputDecoration(
                         labelText: t('auth.repeatPassword'),
                         prefixIcon: const Icon(Icons.lock_reset),
+                        suffixIcon: IconButton(
+                          icon: Icon(_showPass2
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined),
+                          tooltip: t(_showPass2
+                              ? 'auth.hidePassword'
+                              : 'auth.showPassword'),
+                          onPressed: () =>
+                              setState(() => _showPass2 = !_showPass2),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 20),

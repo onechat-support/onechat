@@ -24,6 +24,7 @@ class _WelcomePageState extends State<WelcomePage> {
   final _svc = OnechatService();
   bool _busy = false;
   bool _needsPassword = false;
+  bool _showPassword = false;
   String? _error;
   String? _info;
 
@@ -270,7 +271,7 @@ class _WelcomePageState extends State<WelcomePage> {
                     const SizedBox(height: 14),
                     TextField(
                       controller: _passwordController,
-                      obscureText: true,
+                      obscureText: !_showPassword,
                       autocorrect: false,
                       enableSuggestions: false,
                       textInputAction: TextInputAction.go,
@@ -278,6 +279,16 @@ class _WelcomePageState extends State<WelcomePage> {
                       decoration: InputDecoration(
                         labelText: t('welcome.password'),
                         prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          icon: Icon(_showPassword
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined),
+                          tooltip: t(_showPassword
+                              ? 'auth.hidePassword'
+                              : 'auth.showPassword'),
+                          onPressed: () =>
+                              setState(() => _showPassword = !_showPassword),
+                        ),
                       ),
                     ),
                   ],

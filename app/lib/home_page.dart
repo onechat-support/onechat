@@ -946,39 +946,53 @@ class _ProfileTabState extends State<_ProfileTab> {
   Future<void> _confirmDeleteAccount() async {
     final isGuest = (widget.profile['is_guest'] as bool?) ?? false;
     final passwordCtrl = TextEditingController();
+    var showDeletePw = false;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(t('profile.deleteTitle')),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(isGuest
-                ? t('profile.deleteGuestBody')
-                : t('profile.deleteBody')),
-            if (!isGuest) ...[
-              const SizedBox(height: 14),
-              TextField(
-                controller: passwordCtrl,
-                obscureText: true,
-                decoration: InputDecoration(
-                    labelText: t('profile.deletePassword')),
-              ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: Text(t('profile.deleteTitle')),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(isGuest
+                  ? t('profile.deleteGuestBody')
+                  : t('profile.deleteBody')),
+              if (!isGuest) ...[
+                const SizedBox(height: 14),
+                TextField(
+                  controller: passwordCtrl,
+                  obscureText: !showDeletePw,
+                  decoration: InputDecoration(
+                    labelText: t('profile.deletePassword'),
+                    suffixIcon: IconButton(
+                      icon: Icon(showDeletePw
+                          ? Icons.visibility_off_outlined
+                          : Icons.visibility_outlined),
+                      tooltip: t(showDeletePw
+                          ? 'auth.hidePassword'
+                          : 'auth.showPassword'),
+                      onPressed: () =>
+                          setLocal(() => showDeletePw = !showDeletePw),
+                    ),
+                  ),
+                ),
+              ],
             ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(t('welcome.cancel')),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                  backgroundColor: Colors.redAccent),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(t('profile.deleteConfirm')),
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(t('welcome.cancel')),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-                backgroundColor: Colors.redAccent),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(t('profile.deleteConfirm')),
-          ),
-        ],
       ),
     );
     if (confirmed != true || !mounted) return;
