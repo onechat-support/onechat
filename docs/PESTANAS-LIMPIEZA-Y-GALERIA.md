@@ -96,3 +96,16 @@ La subida moría en su iPhone. Correcciones:
 - **La Galería se ve en el chat**: la ficha de cada usuario
   muestra sus fotos como **carrusel** con contador «1 / 3»
   (las 3 de las cuentas básicas; Premium, todas).
+
+## 8. Reproductor estable y con autoplay (v2026.11.26.6)
+
+Mario reportó que el video flotante se cortaba al mover la
+ventana y al tocar fuera de ella. Causa: `youtubePlayer()`
+creaba un iframe nuevo en cada reconstrucción de la
+pantalla (viewType con contador). Arreglo en fx_web.dart:
+el widget se cachea por video (y el de Cine juntos por
+sesión+video, que sufría lo mismo con su reloj de 1 s) y
+Flutter ya no reemplaza el iframe al redibujar. Además el
+embed parte con `autoplay=1` (el toque en la tarjeta es la
+orden de reproducir) y la pausa queda solo en los controles
+del propio reproductor. Verificado en vivo en ambas rutas.

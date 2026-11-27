@@ -352,7 +352,7 @@ const _es = {
   'revoked.bodyUntil':
       'Tu acceso a ONEchat fue revocado por el equipo de moderación hasta el {when}.',
   'revoked.help':
-      'Si crees que es un error, escribe a onechat.support@gmail.com.',
+      'Si crees que es un error, escribe a support@getonechat.com.',
   'revoked.signOut': 'Cerrar sesión',
   'sheet.privateMessage': 'Mensaje privado',
   'sheet.whisper': 'Susurrar',
@@ -809,7 +809,7 @@ const _en = {
   'revoked.bodyUntil':
       'Your access to ONEchat was revoked by the moderation team until {when}.',
   'revoked.help':
-      'If you believe this is a mistake, write to onechat.support@gmail.com.',
+      'If you believe this is a mistake, write to support@getonechat.com.',
   'revoked.signOut': 'Sign out',
   'sheet.privateMessage': 'Private message',
   'sheet.whisper': 'Whisper',
