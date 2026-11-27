@@ -66,6 +66,7 @@ Future<void> showUserSheet(
   return showModalBottomSheet(
     context: context,
     showDragHandle: true,
+    isScrollControlled: true,
     builder: (_) => _UserSheet(
       profile: profile,
       roomId: roomId,
@@ -417,12 +418,18 @@ class _UserSheetState extends State<_UserSheet> {
   Widget build(BuildContext context) {
     final p = widget.profile;
     final isGuest = p['is_guest'] == true;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    // La ficha es DESPLAZABLE (pedido de Mario, 2026-11-27): con
+    // la Galería grande, los botones y las secciones de
+    // moderación no cabían en la pantalla y quedaban cortados.
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.9),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
           Row(
             children: [
               CircleAvatar(
@@ -706,7 +713,8 @@ class _UserSheetState extends State<_UserSheet> {
               ),
             ],
           ],
-        ],
+          ],
+        ),
       ),
     );
   }
