@@ -256,6 +256,14 @@ class _DmChatPageState extends State<DmChatPage>
 
   Future<void> _sendNudge() async {
     if (_nudgeCooling) return;
+    // Si el otro desactivó los zumbidos, ni lo intentamos.
+    if (!await _svc.canNudge(_otherUid)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(t('chat.nudgesClosed',
+              {'nick': widget.other['nickname'] as String}))));
+      return;
+    }
     setState(() => _nudgeCooling = true);
     _shake();
     if (_soundOn) playSound('nudge');
@@ -266,9 +274,12 @@ class _DmChatPageState extends State<DmChatPage>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('$e'.contains('dm_closed')
-                ? t('chat.dmClosed')
-                : t('chat.sendFailed', {'e': '$e'}))));
+            content: Text('$e'.contains('nudges_closed')
+                ? t('chat.nudgesClosed',
+                    {'nick': widget.other['nickname'] as String})
+                : '$e'.contains('dm_closed')
+                    ? t('chat.dmClosed')
+                    : t('chat.sendFailed', {'e': '$e'}))));
       }
     }
     await Future.delayed(const Duration(seconds: 20));

@@ -47,7 +47,7 @@ const profileColumns =
     'theme_mode,profile_views,created_at,last_seen_at,'
     'show_in_directory,is_premium,conduct_accepted_at,'
     'dm_open,whispers_open,show_system_notices,'
-    'sound_enabled,vibrate_enabled';
+    'sound_enabled,vibrate_enabled,nudges_open,skin';
 
 /// Capa de acceso a Supabase para ONEchat (Etapa 1, MVP).
 /// Toda la seguridad real la impone la base de datos con RLS;
@@ -1361,7 +1361,9 @@ class OnechatService {
       bool? whispersOpen,
       bool? showSystemNotices,
       bool? soundEnabled,
-      bool? vibrateEnabled}) async {
+      bool? vibrateEnabled,
+      bool? nudgesOpen,
+      String? skin}) async {
     final patch = <String, dynamic>{};
     if (bio != null) patch['bio'] = bio;
     if (colorHex != null) patch['nickname_color'] = colorHex;
@@ -1380,6 +1382,8 @@ class OnechatService {
     if (vibrateEnabled != null) {
       patch['vibrate_enabled'] = vibrateEnabled;
     }
+    if (nudgesOpen != null) patch['nudges_open'] = nudgesOpen;
+    if (skin != null) patch['skin'] = skin;
     if (patch.isEmpty) return;
     await _db.from('profiles').update(patch).eq('uid', myUid!);
   }
@@ -1397,6 +1401,12 @@ class OnechatService {
   /// ¿Puedo escribirle un privado a este usuario? (punto 11)
   Future<bool> canDm(String targetUid) async {
     final r = await _db.rpc('can_dm', params: {'p_target': targetUid});
+    return r == true;
+  }
+
+  /// ¿Acepta zumbidos este usuario? (v1.28)
+  Future<bool> canNudge(String targetUid) async {
+    final r = await _db.rpc('can_nudge', params: {'p_other': targetUid});
     return r == true;
   }
 

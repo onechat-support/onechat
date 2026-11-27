@@ -42,13 +42,19 @@ class OneChatApp extends StatelessWidget {
       valueListenable: appThemeMode,
       builder: (context, mode, _) => ValueListenableBuilder<String>(
         valueListenable: appLanguage,
-        builder: (context, lang, _) => MaterialApp(
-          title: 'ONEchat',
-          debugShowCheckedModeBanner: false,
-          theme: buildOneChatLightTheme(),
-          darkTheme: buildOneChatDarkTheme(),
-          themeMode: mode, // el del perfil: system | dark | light (§9)
-          home: const SessionGate(),
+        builder: (context, lang, _) => ValueListenableBuilder<String>(
+          valueListenable: appSkin,
+          builder: (context, skin, _) => MaterialApp(
+            title: 'ONEchat',
+            debugShowCheckedModeBanner: false,
+            // Skin nostálgico activo (v1.28): manda su tema claro.
+            theme: skin == 'mensajero'
+                ? buildMessengerTheme()
+                : buildOneChatLightTheme(),
+            darkTheme: buildOneChatDarkTheme(),
+            themeMode: skin == 'mensajero' ? ThemeMode.light : mode,
+            home: const SessionGate(),
+          ),
         ),
       ),
     );

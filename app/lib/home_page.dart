@@ -791,6 +791,16 @@ class _ProfileTabState extends State<_ProfileTab> {
     if (fresh != null && mounted) widget.onProfileChanged(fresh);
   }
 
+  /// Tema visual nostálgico (v1.28): se aplica al instante vía
+  /// applyProfileTheme (la llama el flujo de perfil) y queda
+  /// guardado en el perfil.
+  Future<void> _saveSkin(String skin) async {
+    appSkin.value = skin;
+    await _svc.updateMyProfile(skin: skin);
+    final fresh = await _svc.fetchMyProfile();
+    if (fresh != null && mounted) widget.onProfileChanged(fresh);
+  }
+
   Future<void> _saveCountry(String? country) async {
     if (country == null) return;
     await _svc.updateMyProfile(country: country);
@@ -806,6 +816,7 @@ class _ProfileTabState extends State<_ProfileTab> {
     bool? showSystemNotices,
     bool? soundEnabled,
     bool? vibrateEnabled,
+    bool? nudgesOpen,
   }) async {
     await _svc.updateMyProfile(
       dmOpen: dmOpen,
@@ -813,6 +824,7 @@ class _ProfileTabState extends State<_ProfileTab> {
       showSystemNotices: showSystemNotices,
       soundEnabled: soundEnabled,
       vibrateEnabled: vibrateEnabled,
+      nudgesOpen: nudgesOpen,
     );
     final fresh = await _svc.fetchMyProfile();
     if (fresh != null && mounted) widget.onProfileChanged(fresh);
@@ -935,6 +947,7 @@ class _ProfileTabState extends State<_ProfileTab> {
 
   Future<void> _signOut() async {
     appThemeMode.value = ThemeMode.dark; // la bienvenida va en oscuro
+    appSkin.value = 'onechat';
     await _svc.signOut();
     if (!mounted) return;
     Navigator.of(context).pushAndRemoveUntil(
@@ -1007,6 +1020,7 @@ class _ProfileTabState extends State<_ProfileTab> {
         SnackBar(content: Text(t('profile.deleted'))),
       );
       appThemeMode.value = ThemeMode.dark;
+      appSkin.value = 'onechat';
       try {
         await _svc.signOut();
       } catch (_) {
@@ -1202,6 +1216,29 @@ class _ProfileTabState extends State<_ProfileTab> {
           onSelectionChanged: (s) => _saveLanguage(s.first),
         ),
         const SizedBox(height: 22),
+        Text(t('profile.skin'),
+            style: const TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text(t('profile.skinHint'),
+            style: TextStyle(
+                fontSize: 12.5,
+                color: Theme.of(context).colorScheme.onSurfaceVariant)),
+        const SizedBox(height: 10),
+        SegmentedButton<String>(
+          segments: [
+            ButtonSegment(
+                value: 'onechat',
+                icon: const Icon(Icons.chat_bubble_outline),
+                label: Text(t('profile.skinOnechat'))),
+            ButtonSegment(
+                value: 'mensajero',
+                icon: const Icon(Icons.waving_hand_outlined),
+                label: Text(t('profile.skinMessenger'))),
+          ],
+          selected: {p['skin'] as String? ?? 'onechat'},
+          onSelectionChanged: (s) => _saveSkin(s.first),
+        ),
+        const SizedBox(height: 22),
         TextField(
           controller: _bio,
           maxLines: 3,
@@ -1264,6 +1301,13 @@ class _ProfileTabState extends State<_ProfileTab> {
           subtitle: Text(t('profile.vibrateHint')),
           value: p['vibrate_enabled'] != false,
           onChanged: (v) => _savePrivacy(vibrateEnabled: v),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(t('profile.nudges')),
+          subtitle: Text(t('profile.nudgesHint')),
+          value: p['nudges_open'] != false,
+          onChanged: (v) => _savePrivacy(nudgesOpen: v),
         ),
         const SizedBox(height: 8),
         OutlinedButton.icon(
