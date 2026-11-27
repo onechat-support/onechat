@@ -196,6 +196,7 @@ class _DmChatPageState extends State<DmChatPage>
 
   // Gato 1 vs 1 dentro del privado
   Map<String, dynamic>? _game;
+  Map<String, int>? _vsRecord;
   RealtimeChannel? _gameChannel;
   bool _gameBusy = false;
   final Set<String> _dismissedGames = {};
@@ -418,6 +419,7 @@ class _DmChatPageState extends State<DmChatPage>
   }
 
   Future<void> _loadGame() async {
+    _loadVsRecord();
     final g = await _svc.fetchPairGame(_otherUid);
     if (!mounted) return;
     if (g == null || g['status'] == 'declined' ||
@@ -433,8 +435,36 @@ class _DmChatPageState extends State<DmChatPage>
     if (_gameChannel != null) return;
     _gameChannel = _svc.subscribeGame(gameId, (row) {
       if (!mounted) return;
+      final justFinished =
+          row['status'] == 'finished' && _game?['status'] != 'finished';
       setState(() => _game = {...?_game, ...row});
+      if (justFinished) _loadVsRecord();
     });
+  }
+
+  /// Récord vs contra esta persona (v1.26): se carga al abrir el
+  /// privado y cada vez que termina una partida.
+  Future<void> _loadVsRecord() async {
+    final r = await _svc.gameRecordVs(_otherUid);
+    if (mounted) setState(() => _vsRecord = r);
+  }
+
+  Widget _vsLine() {
+    final r = _vsRecord;
+    if (r == null) return const SizedBox.shrink();
+    final total = r['wins']! + r['losses']! + r['draws']!;
+    if (total == 0) return const SizedBox.shrink();
+    return Text(
+      t('game.vsScore', {
+        'nick': widget.other['nickname'] as String,
+        'w': '${r['wins']}',
+        'l': '${r['losses']}',
+        'd': r['draws'].toString(),
+      }),
+      style: TextStyle(
+          fontSize: 12.5,
+          color: Theme.of(context).colorScheme.onSurfaceVariant),
+    );
   }
 
   Future<void> _refreshGame() async {
@@ -820,13 +850,22 @@ class _DmChatPageState extends State<DmChatPage>
     if (g == null) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: OutlinedButton.icon(
-            onPressed: _gameBusy ? null : _invite,
-            icon: const Icon(Icons.grid_3x3, size: 18),
-            label: Text(t('game.play')),
-          ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: _gameBusy ? null : _invite,
+                icon: const Icon(Icons.grid_3x3, size: 18),
+                label: Text(t('game.play')),
+              ),
+            ),
+            if (_vsRecord != null) ...[
+              const SizedBox(height: 4),
+              _vsLine(),
+            ],
+          ],
         ),
       );
     }
@@ -878,9 +917,18 @@ class _DmChatPageState extends State<DmChatPage>
         : winner == me
             ? t('game.youWon')
             : t('game.theyWon', {'nick': otherNick});
-    header = Text(result,
-        style: const TextStyle(
-            fontWeight: FontWeight.bold, color: OneChatColors.primary));
+    header = Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(result,
+            style: const TextStyle(
+                fontWeight: FontWeight.bold, color: OneChatColors.primary)),
+        if (_vsRecord != null) ...[
+          const SizedBox(height: 3),
+          _vsLine(),
+        ],
+      ],
+    );
     actions = [
       _gameButton(t('game.rematch'), _gameBusy ? null : _invite,
           primary: true),

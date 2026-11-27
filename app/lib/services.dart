@@ -267,6 +267,13 @@ class OnechatService {
       try {
         await _db.from('notifications').delete().eq('uid', uid);
       } catch (_) {}
+      // Privacidad (Mario, 2026-11-27): al cerrar la sesión se
+      // borra también el historial de conversaciones privadas
+      // (la conversación completa, con sus mensajes). El récord
+      // de juegos vs vive en game_records y se conserva.
+      try {
+        await _db.rpc('clear_my_private_history');
+      } catch (_) {}
       final profile = await fetchMyProfile();
       if (profile != null && profile['is_guest'] == true) {
         await _db.from('profiles').delete().eq('uid', uid);
@@ -1146,6 +1153,29 @@ class OnechatService {
         .order('created_at', ascending: false)
         .limit(1);
     return rows.isEmpty ? null : rows.first;
+  }
+
+  /// Récord histórico vs contra otro jugador (v1.26): mis
+  /// victorias, derrotas y empates contra esa persona. Vive en
+  /// game_records y sobrevive al borrado de la conversación.
+  Future<Map<String, int>?> gameRecordVs(String otherUid) async {
+    final me = myUid;
+    if (me == null) return null;
+    final iAmA = me.compareTo(otherUid) < 0;
+    final a = iAmA ? me : otherUid;
+    final b = iAmA ? otherUid : me;
+    final row = await _db
+        .from('game_records')
+        .select('a_wins, b_wins, draws')
+        .eq('user_a', a)
+        .eq('user_b', b)
+        .maybeSingle();
+    if (row == null) return null;
+    return {
+      'wins': (iAmA ? row['a_wins'] : row['b_wins']) as int,
+      'losses': (iAmA ? row['b_wins'] : row['a_wins']) as int,
+      'draws': row['draws'] as int,
+    };
   }
 
   RealtimeChannel subscribeGame(
