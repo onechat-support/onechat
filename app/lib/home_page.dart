@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'chat_page.dart';
+import 'dashboard_pages.dart';
 import 'config.dart';
 import 'dm_pages.dart';
 import 'main.dart';
@@ -448,6 +449,7 @@ class _StatusTabState extends State<_StatusTab> {
   final _svc = OnechatService();
   late Future<List<Map<String, dynamic>>> _items = _load();
   bool _centerVisible = false;
+  bool _panelVisible = false;
 
   @override
   void initState() {
@@ -455,6 +457,13 @@ class _StatusTabState extends State<_StatusTab> {
     _svc.myPowerStatus().then((st) {
       if (mounted) {
         setState(() => _centerVisible = st['center_visible'] == true);
+      }
+    }).catchError((_) {});
+    _svc.dashboardMyRooms().then((m) {
+      if (mounted) {
+        final rooms = m['rooms'];
+        setState(() => _panelVisible =
+            m['is_staff'] == true || (rooms is List && rooms.isNotEmpty));
       }
     }).catchError((_) {});
   }
@@ -635,6 +644,16 @@ class _StatusTabState extends State<_StatusTab> {
             trailing: const Icon(Icons.chevron_right, size: 18),
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => const ReportCenterPage())),
+          ),
+          const Divider(height: 1),
+        ],
+        if (_panelVisible) ...[
+          ListTile(
+            leading: const Icon(Icons.dashboard_outlined),
+            title: Text(t('dash.open')),
+            trailing: const Icon(Icons.chevron_right, size: 18),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const ControlPanelPage())),
           ),
           const Divider(height: 1),
         ],

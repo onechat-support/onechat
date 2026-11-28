@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'config.dart';
 import 'device_identity.dart';
+import 'visit_source.dart';
 import 'strings.dart';
 
 /// Traduce los errores de autenticación a lenguaje claro para el
@@ -310,9 +311,13 @@ class OnechatService {
   Future<Map<String, dynamic>> entryCheck() async {
     try {
       final id = await getDeviceIdentity();
+      final vs = captureVisitSource();
       final res = await _db.functions.invoke('log-visit', body: {
         'device_id': id.deviceId,
         'fingerprint': id.fingerprint,
+        'referrer': vs.referrer,
+        'landing': vs.landing,
+        'client_hint': vs.landing.isNotEmpty ? 'web' : 'app',
       });
       final data = res.data;
       if (data is Map) return Map<String, dynamic>.from(data);
@@ -334,6 +339,30 @@ class OnechatService {
     } catch (_) {
       return 'user';
     }
+  }
+
+  /// Panel de control global (v1.29): agregados de la
+  /// plataforma para Staff y dueño. Devuelve
+  /// {'error': 'forbidden'} si el usuario no tiene permiso.
+  Future<Map<String, dynamic>> dashboardGlobal() async {
+    final r = await _db.rpc('dashboard_global');
+    return Map<String, dynamic>.from(r as Map);
+  }
+
+  /// Panel de control (v1.29): salas que el usuario puede
+  /// administrar en panel (Staff: todas; dueño de sala: las
+  /// suyas; moderador: solo donde modera) y si es Staff global.
+  Future<Map<String, dynamic>> dashboardMyRooms() async {
+    final r = await _db.rpc('dashboard_my_rooms');
+    return Map<String, dynamic>.from(r as Map);
+  }
+
+  /// Panel de una sala (v1.29): historial de moderación,
+  /// sancionados actuales y equipo de moderación con su
+  /// actividad y ranking. El servidor verifica el permiso.
+  Future<Map<String, dynamic>> dashboardRoom(String roomId) async {
+    final r = await _db.rpc('dashboard_room', params: {'p_room': roomId});
+    return Map<String, dynamic>.from(r as Map);
   }
 
   /// Aplicar el Destierro (S1): bloquea cuenta + dispositivo

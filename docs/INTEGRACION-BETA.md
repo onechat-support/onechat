@@ -174,3 +174,23 @@ los toques — tocar el video pausa/reanuda para ambos vía
 `_cineTogglePlay`, el botón de YouTube ya no se puede apretar;
 al activarse la sesión (o entrar a media sesión) el reproductor
 se lleva a la posición compartida a los ~1,4 s de cargar.
+
+## Addendum v2026.11.26.16 (2026-11-27) — Cine: capa de toques
+
+La v.15 dejó el chip «Activar sonido» en la esquina inferior
+derecha, justo sobre el botón «Ver en YouTube» del iframe, y
+los toques caían en el iframe (los widgets del lienzo de
+Flutter no reciben toques sobre un iframe web). Solución de la
+v.16: `cineTapOverlay` — una capa web real (div) sobre todo el
+reproductor que recibe el 100 % de los toques; el botón de
+sonido va ahora en el CENTRO del reproductor (donde iría el
+botón rojo de YouTube, idea de Mario); primer toque = activar
+sonido, siguientes = pausar/reanudar para ambos. Ni el botón
+rojo ni «Ver en YouTube» se pueden apretar.
+
+## Addendum v2026.11.26.17 (2026-11-27) — Catálogo de cine
+
+Catálogo de 15 películas gratis y legales (dominio público y
+CC), verificadas incrustables una a una, integrado en el
+diálogo de invitación de Cine juntos. Detalle y criterio en
+docs/CATALOGO-CINE.md; datos en app/lib/cine_catalog.dart.

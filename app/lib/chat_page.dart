@@ -2,6 +2,7 @@ import 'package:flutter/services.dart' as fservices;
 import 'package:material_ui/material_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'dashboard_pages.dart';
 import 'dm_pages.dart';
 import 'fx.dart';
 import 'report_pages.dart';
@@ -953,6 +954,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               icon: const Icon(Icons.shield_outlined),
               tooltip: t('chat.modTooltip'),
               onPressed: _showModerationPanel,
+            ),
+          if (_canModerate)
+            IconButton(
+              icon: const Icon(Icons.dashboard_outlined),
+              tooltip: t('dash.roomPanel'),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => RoomDashboardPage(
+                    roomId: widget.room['id'] as String,
+                    roomName: widget.room['name'] as String,
+                  ),
+                ),
+              ),
             ),
           IconButton(
             icon: const Icon(Icons.people_outline),
